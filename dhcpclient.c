@@ -29,16 +29,16 @@ extern int (*ifc_init)(void);
 extern void (*ifc_close)(void);
 extern int (*do_dhcp)(const char *iname);
 extern void (*get_dhcp_info)(uint32_t *ipaddr, uint32_t *gateway, uint32_t *prefixLength,
-                   uint32_t *dns1, uint32_t *dns2, uint32_t *server,
-                   uint32_t *lease);  
+                             uint32_t *dns1, uint32_t *dns2, uint32_t *server,
+                             uint32_t *lease);
 extern int (*property_set)(const char *key, const char *value);
 #else
 #include <cutils/properties.h>
 #include <netutils/ifc.h>
 extern int do_dhcp(const char *iname);
 extern void get_dhcp_info(uint32_t *ipaddr, uint32_t *gateway, uint32_t *prefixLength,
-                   uint32_t *dns1, uint32_t *dns2, uint32_t *server,
-                   uint32_t *lease);  
+                          uint32_t *dns1, uint32_t *dns2, uint32_t *server,
+                          uint32_t *lease);
 #endif
 
 static const char *ipaddr_to_string(in_addr_t addr)
@@ -49,11 +49,13 @@ static const char *ipaddr_to_string(in_addr_t addr)
     return inet_ntoa(in_addr);
 }
 
-void do_dhcp_request(PROFILE_T *profile) {
+void do_dhcp_request(PROFILE_T *profile)
+{
 #ifdef USE_NDK
-    if (!ifc_init ||!ifc_close ||!do_dhcp || !get_dhcp_info || !property_set) {
+    if (!ifc_init || !ifc_close || !do_dhcp || !get_dhcp_info || !property_set)
+    {
         return;
-    }    
+    }
 #endif
 
     char *ifname = profile->usbnet_adapter;
@@ -73,17 +75,19 @@ void do_dhcp_request(PROFILE_T *profile) {
     }
 #endif
 
-    if(ifc_init()) {
+    if (ifc_init())
+    {
         dbg_time("failed to ifc_init(%s): %s\n", ifname, strerror(errno));
     }
 
-    if (do_dhcp(ifname) < 0) {
+    if (do_dhcp(ifname) < 0)
+    {
         dbg_time("failed to do_dhcp(%s): %s\n", ifname, strerror(errno));
     }
 
     ifc_close();
 
-    get_dhcp_info(&ipaddr,  &gateway,  &prefixLength, &dns1, &dns2, &server, &lease);
+    get_dhcp_info(&ipaddr, &gateway, &prefixLength, &dns1, &dns2, &server, &lease);
     snprintf(propKey, sizeof(propKey), "net.%s.gw", ifname);
     property_set(propKey, gateway ? ipaddr_to_string(gateway) : "0.0.0.0");
 }

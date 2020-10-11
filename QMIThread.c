@@ -1,15 +1,17 @@
 #include "QMIThread.h"
-extern char *strndup (const char *__string, size_t __n);
+extern char *strndup(const char *__string, size_t __n);
 
 int qmiclientId[QMUX_TYPE_WDS_ADMIN + 1]; //GobiNet use fd to indicate client ID, so type of qmiclientId must be int
 static uint32_t WdsConnectionIPv4Handle = 0;
 static uint32_t WdsConnectionIPv6Handle = 0;
 static int s_is_cdma = 0;
 static int s_hdr_personality = 0; // 0x01-HRPD, 0x02-eHRPD
-static char *qstrcpy(char *to, const char *from) { //no __strcpy_chk
-	char *save = to;
-	for (; (*to = *from) != '\0'; ++from, ++to);
-	return(save);
+static char *qstrcpy(char *to, const char *from)
+{ //no __strcpy_chk
+    char *save = to;
+    for (; (*to = *from) != '\0'; ++from, ++to)
+        ;
+    return (save);
 }
 
 static int s_9x07 = -1;
@@ -17,17 +19,22 @@ static int s_9x07 = -1;
 typedef USHORT (*CUSTOMQMUX)(PQMUX_MSG pMUXMsg, void *arg);
 
 // To retrieve the ith (Index) TLV
-PQMI_TLV_HDR GetTLV (PQCQMUX_MSG_HDR pQMUXMsgHdr, int TLVType) {
+PQMI_TLV_HDR GetTLV(PQCQMUX_MSG_HDR pQMUXMsgHdr, int TLVType)
+{
     int TLVFind = 0;
     USHORT Length = le16_to_cpu(pQMUXMsgHdr->Length);
     PQMI_TLV_HDR pTLVHdr = (PQMI_TLV_HDR)(pQMUXMsgHdr + 1);
 
-    while (Length >= sizeof(QMI_TLV_HDR)) {
+    while (Length >= sizeof(QMI_TLV_HDR))
+    {
         TLVFind++;
-        if (TLVType > 0x1000) {
+        if (TLVType > 0x1000)
+        {
             if ((TLVFind + 0x1000) == TLVType)
                 return pTLVHdr;
-        } else  if (pTLVHdr->TLVType == TLVType) {
+        }
+        else if (pTLVHdr->TLVType == TLVType)
+        {
             return pTLVHdr;
         }
 
@@ -35,17 +42,19 @@ PQMI_TLV_HDR GetTLV (PQCQMUX_MSG_HDR pQMUXMsgHdr, int TLVType) {
         pTLVHdr = (PQMI_TLV_HDR)(((UCHAR *)pTLVHdr) + le16_to_cpu(pTLVHdr->TLVLength) + sizeof(QMI_TLV_HDR));
     }
 
-   return NULL;
+    return NULL;
 }
 
-static USHORT GetQMUXTransactionId(void) {
+static USHORT GetQMUXTransactionId(void)
+{
     static int TransactionId = 0;
     if (++TransactionId > 0xFFFF)
         TransactionId = 1;
     return TransactionId;
 }
 
-static PQCQMIMSG ComposeQMUXMsg(UCHAR QMIType, USHORT Type, CUSTOMQMUX customQmuxMsgFunction, void *arg) {
+static PQCQMIMSG ComposeQMUXMsg(UCHAR QMIType, USHORT Type, CUSTOMQMUX customQmuxMsgFunction, void *arg)
+{
     UCHAR QMIBuf[WDM_DEFAULT_BUFSIZE];
     PQCQMIMSG pRequest = (PQCQMIMSG)QMIBuf;
     int Length;
@@ -56,7 +65,8 @@ static PQCQMIMSG ComposeQMUXMsg(UCHAR QMIType, USHORT Type, CUSTOMQMUX customQmu
     pRequest->QMIHdr.QMIType = QMIType;
     pRequest->QMIHdr.ClientId = qmiclientId[QMIType] & 0xFF;
 
-    if (qmiclientId[QMIType] == 0) {
+    if (qmiclientId[QMIType] == 0)
+    {
         dbg_time("QMIType %d has no clientID", QMIType);
         return NULL;
     }
@@ -69,14 +79,16 @@ static PQCQMIMSG ComposeQMUXMsg(UCHAR QMIType, USHORT Type, CUSTOMQMUX customQmu
     else
         pRequest->MUXMsg.QMUXMsgHdr.Length = cpu_to_le16(0x0000);
 
-    pRequest->QMIHdr.Length = cpu_to_le16(le16_to_cpu(pRequest->MUXMsg.QMUXMsgHdr.Length) + sizeof(QCQMUX_MSG_HDR) + sizeof(QCQMUX_HDR)
-        + sizeof(QCQMI_HDR) - 1);
+    pRequest->QMIHdr.Length = cpu_to_le16(le16_to_cpu(pRequest->MUXMsg.QMUXMsgHdr.Length) + sizeof(QCQMUX_MSG_HDR) + sizeof(QCQMUX_HDR) + sizeof(QCQMI_HDR) - 1);
     Length = le16_to_cpu(pRequest->QMIHdr.Length) + 1;
 
     pRequest = (PQCQMIMSG)malloc(Length);
-    if (pRequest == NULL) {
+    if (pRequest == NULL)
+    {
         dbg_time("%s fail to malloc", __func__);
-    } else {
+    }
+    else
+    {
         memcpy(pRequest, QMIBuf, Length);
     }
 
@@ -129,7 +141,8 @@ static USHORT DmsSetEventReportReq(PQMUX_MSG pMUXMsg) {
 }
 #endif
 
-static USHORT WdsStartNwInterfaceReq(PQMUX_MSG pMUXMsg, void *arg) {
+static USHORT WdsStartNwInterfaceReq(PQMUX_MSG pMUXMsg, void *arg)
+{
     PQMIWDS_TECHNOLOGY_PREFERECE pTechPref;
     PQMIWDS_AUTH_PREFERENCE pAuthPref;
     PQMIWDS_USERNAME pUserName;
@@ -143,7 +156,8 @@ static USHORT WdsStartNwInterfaceReq(PQMUX_MSG pMUXMsg, void *arg) {
     const char *profile_password = profile->password;
     int profile_auth = profile->auth;
 
-    if (s_is_cdma && (profile_user == NULL || profile_user[0] == '\0') && (profile_password == NULL || profile_password[0] == '\0')) {
+    if (s_is_cdma && (profile_user == NULL || profile_user[0] == '\0') && (profile_password == NULL || profile_password[0] == '\0'))
+    {
         profile_user = "ctnet@mycdma.cn";
         profile_password = "vnet.mobi";
         profile_auth = 2; //chap
@@ -160,19 +174,21 @@ static USHORT WdsStartNwInterfaceReq(PQMUX_MSG pMUXMsg, void *arg) {
         pTechPref->TechPreference = 0x01;
     else
         pTechPref->TechPreference = 0x02;
-    TLVLength +=(le16_to_cpu(pTechPref->TLVLength) + sizeof(QCQMICTL_TLV_HDR));
+    TLVLength += (le16_to_cpu(pTechPref->TLVLength) + sizeof(QCQMICTL_TLV_HDR));
 
     // Set APN Name
-    if (profile->apn) {
+    if (profile->apn)
+    {
         pApnName = (PQMIWDS_APNNAME)(pTLV + TLVLength);
         pApnName->TLVType = 0x14;
         pApnName->TLVLength = cpu_to_le16(strlen(profile->apn));
         qstrcpy((char *)&pApnName->ApnName, profile->apn);
-        TLVLength +=(le16_to_cpu(pApnName->TLVLength) + sizeof(QCQMICTL_TLV_HDR));
+        TLVLength += (le16_to_cpu(pApnName->TLVLength) + sizeof(QCQMICTL_TLV_HDR));
     }
 
     // Set User Name
-    if (profile_user) {
+    if (profile_user)
+    {
         pUserName = (PQMIWDS_USERNAME)(pTLV + TLVLength);
         pUserName->TLVType = 0x17;
         pUserName->TLVLength = cpu_to_le16(strlen(profile_user));
@@ -181,16 +197,18 @@ static USHORT WdsStartNwInterfaceReq(PQMUX_MSG pMUXMsg, void *arg) {
     }
 
     // Set Password
-    if (profile_password) {
+    if (profile_password)
+    {
         pPasswd = (PQMIWDS_PASSWD)(pTLV + TLVLength);
         pPasswd->TLVType = 0x18;
         pPasswd->TLVLength = cpu_to_le16(strlen(profile_password));
         qstrcpy((char *)&pPasswd->Passwd, profile_password);
-	TLVLength += (le16_to_cpu(pPasswd->TLVLength) + sizeof(QCQMICTL_TLV_HDR));
+        TLVLength += (le16_to_cpu(pPasswd->TLVLength) + sizeof(QCQMICTL_TLV_HDR));
     }
 
     // Set Auth Protocol
-    if (profile_user && profile_password) {
+    if (profile_user && profile_password)
+    {
         pAuthPref = (PQMIWDS_AUTH_PREFERENCE)(pTLV + TLVLength);
         pAuthPref->TLVType = 0x16;
         pAuthPref->TLVLength = cpu_to_le16(0x01);
@@ -206,12 +224,14 @@ static USHORT WdsStartNwInterfaceReq(PQMUX_MSG pMUXMsg, void *arg) {
     TLVLength += (le16_to_cpu(pIpFamily->TLVLength) + sizeof(QCQMICTL_TLV_HDR));
 
     //Set Profile Index
-    if (profile->pdp && !s_is_cdma) { //cdma only allow one pdp
+    if (profile->pdp && !s_is_cdma)
+    { //cdma only allow one pdp
         PQMIWDS_PROFILE_IDENTIFIER pProfileIndex = (PQMIWDS_PROFILE_IDENTIFIER)(pTLV + TLVLength);
         pProfileIndex->TLVLength = cpu_to_le16(0x01);
         pProfileIndex->TLVType = 0x31;
         pProfileIndex->ProfileIndex = profile->pdp;
-        if (s_is_cdma && s_hdr_personality == 0x02) {
+        if (s_is_cdma && s_hdr_personality == 0x02)
+        {
             pProfileIndex->TLVType = 0x32; //profile_index_3gpp2
             pProfileIndex->ProfileIndex = 101;
         }
@@ -221,31 +241,35 @@ static USHORT WdsStartNwInterfaceReq(PQMUX_MSG pMUXMsg, void *arg) {
     return sizeof(QMIWDS_START_NETWORK_INTERFACE_REQ_MSG) + TLVLength;
 }
 
-static USHORT WdsStopNwInterfaceReq(PQMUX_MSG pMUXMsg, void *arg) {
+static USHORT WdsStopNwInterfaceReq(PQMUX_MSG pMUXMsg, void *arg)
+{
     pMUXMsg->StopNwInterfaceReq.TLVType = 0x01;
     pMUXMsg->StopNwInterfaceReq.TLVLength = cpu_to_le16(0x04);
     if (*((int *)arg) == IpFamilyV4)
-        pMUXMsg->StopNwInterfaceReq.Handle =  cpu_to_le32(WdsConnectionIPv4Handle);
+        pMUXMsg->StopNwInterfaceReq.Handle = cpu_to_le32(WdsConnectionIPv4Handle);
     else
-        pMUXMsg->StopNwInterfaceReq.Handle =  cpu_to_le32(WdsConnectionIPv6Handle);
+        pMUXMsg->StopNwInterfaceReq.Handle = cpu_to_le32(WdsConnectionIPv6Handle);
     return sizeof(QMIWDS_STOP_NETWORK_INTERFACE_REQ_MSG);
 }
 
-static USHORT WdsSetClientIPFamilyPref(PQMUX_MSG pMUXMsg, void *arg) {
+static USHORT WdsSetClientIPFamilyPref(PQMUX_MSG pMUXMsg, void *arg)
+{
     pMUXMsg->SetClientIpFamilyPrefReq.TLVType = 0x01;
     pMUXMsg->SetClientIpFamilyPrefReq.TLVLength = cpu_to_le16(0x01);
     pMUXMsg->SetClientIpFamilyPrefReq.IpPreference = *((UCHAR *)arg);
     return sizeof(QMIWDS_SET_CLIENT_IP_FAMILY_PREF_REQ_MSG);
 }
 
-static USHORT WdsSetAutoConnect(PQMUX_MSG pMUXMsg, void *arg) {
+static USHORT WdsSetAutoConnect(PQMUX_MSG pMUXMsg, void *arg)
+{
     pMUXMsg->SetAutoConnectReq.TLVType = 0x01;
     pMUXMsg->SetAutoConnectReq.TLVLength = cpu_to_le16(0x01);
     pMUXMsg->SetAutoConnectReq.autoconnect_setting = *((UCHAR *)arg);
     return sizeof(QMIWDS_SET_AUTO_CONNECT_REQ_MSG);
 }
 
-static USHORT WdaSetDataFormat(PQMUX_MSG pMUXMsg, void *arg) {
+static USHORT WdaSetDataFormat(PQMUX_MSG pMUXMsg, void *arg)
+{
     PQMIWDS_ADMIN_SET_DATA_FORMAT_TLV_QOS pWdsAdminQosTlv;
     PQMIWDS_ADMIN_SET_DATA_FORMAT_TLV linkProto;
     PQMIWDS_ADMIN_SET_DATA_FORMAT_TLV dlTlp;
@@ -258,21 +282,23 @@ static USHORT WdaSetDataFormat(PQMUX_MSG pMUXMsg, void *arg) {
     linkProto = (PQMIWDS_ADMIN_SET_DATA_FORMAT_TLV)(pWdsAdminQosTlv + 1);
     linkProto->TLVType = 0x11;
     linkProto->TLVLength = cpu_to_le16(4);
-    linkProto->Value = cpu_to_le32(0x01);     /* Set Ethernet  mode */
+    linkProto->Value = cpu_to_le32(0x01); /* Set Ethernet  mode */
 
-    dlTlp = (PQMIWDS_ADMIN_SET_DATA_FORMAT_TLV)(linkProto + 1);;
+    dlTlp = (PQMIWDS_ADMIN_SET_DATA_FORMAT_TLV)(linkProto + 1);
+    ;
     dlTlp->TLVType = 0x13;
     dlTlp->TLVLength = cpu_to_le16(4);
     dlTlp->Value = cpu_to_le32(0x00);
 
-    if (sizeof(*linkProto) != 7 )
-        dbg_time("%s sizeof(*linkProto) = %d, is not 7!", __func__, sizeof(*linkProto) );
+    if (sizeof(*linkProto) != 7)
+        dbg_time("%s sizeof(*linkProto) = %d, is not 7!", __func__, sizeof(*linkProto));
 
     return sizeof(QCQMUX_MSG_HDR) + sizeof(*pWdsAdminQosTlv) + sizeof(*linkProto) + sizeof(*dlTlp);
 }
 
 #ifdef CONFIG_SIM
-static USHORT DmsUIMVerifyPinReqSend(PQMUX_MSG pMUXMsg, void *arg) {
+static USHORT DmsUIMVerifyPinReqSend(PQMUX_MSG pMUXMsg, void *arg)
+{
     pMUXMsg->UIMVerifyPinReq.TLVType = 0x01;
     pMUXMsg->UIMVerifyPinReq.PINID = 0x01; //Pin1, not Puk
     pMUXMsg->UIMVerifyPinReq.PINLen = strlen((const char *)arg);
@@ -289,19 +315,21 @@ static USHORT UimVerifyPinReqSend(PQMUX_MSG pMUXMsg, void *arg)
     pMUXMsg->UIMUIMVerifyPinReq.Aid_Len = 0x00;
     pMUXMsg->UIMUIMVerifyPinReq.TLV2Type = 0x02;
     pMUXMsg->UIMUIMVerifyPinReq.TLV2Length = cpu_to_le16(2 + strlen((const char *)arg));
-    pMUXMsg->UIMUIMVerifyPinReq.PINID = 0x01;  //Pin1, not Puk
-    pMUXMsg->UIMUIMVerifyPinReq.PINLen= strlen((const char *)arg);
+    pMUXMsg->UIMUIMVerifyPinReq.PINID = 0x01; //Pin1, not Puk
+    pMUXMsg->UIMUIMVerifyPinReq.PINLen = strlen((const char *)arg);
     qstrcpy((PCHAR)&pMUXMsg->UIMUIMVerifyPinReq.PINValue, ((const char *)arg));
     return sizeof(QMIUIM_VERIFY_PIN_REQ_MSG) + (strlen((const char *)arg) - 1);
 }
 
 #ifdef CONFIG_IMSI_ICCID
-static USHORT UimReadTransparentIMSIReqSend(PQMUX_MSG pMUXMsg, void *arg) {
+static USHORT UimReadTransparentIMSIReqSend(PQMUX_MSG pMUXMsg, void *arg)
+{
     PREAD_TRANSPARENT_TLV pReadTransparent;
 
-    pMUXMsg->UIMUIMReadTransparentReq.TLVType =  0x01;
+    pMUXMsg->UIMUIMReadTransparentReq.TLVType = 0x01;
     pMUXMsg->UIMUIMReadTransparentReq.TLVLength = cpu_to_le16(0x02);
-    if (!strcmp((char *)arg, "EF_ICCID")) {
+    if (!strcmp((char *)arg, "EF_ICCID"))
+    {
         pMUXMsg->UIMUIMReadTransparentReq.Session_Type = 0x06;
         pMUXMsg->UIMUIMReadTransparentReq.Aid_Len = 0x00;
 
@@ -311,7 +339,8 @@ static USHORT UimReadTransparentIMSIReqSend(PQMUX_MSG pMUXMsg, void *arg) {
         pMUXMsg->UIMUIMReadTransparentReq.path[0] = 0x00;
         pMUXMsg->UIMUIMReadTransparentReq.path[1] = 0x3F;
     }
-    else if(!strcmp((char *)arg, "EF_IMSI")) {
+    else if (!strcmp((char *)arg, "EF_IMSI"))
+    {
         pMUXMsg->UIMUIMReadTransparentReq.Session_Type = 0x00;
         pMUXMsg->UIMUIMReadTransparentReq.Aid_Len = 0x00;
 
@@ -324,7 +353,7 @@ static USHORT UimReadTransparentIMSIReqSend(PQMUX_MSG pMUXMsg, void *arg) {
         pMUXMsg->UIMUIMReadTransparentReq.path[3] = 0x7F;
     }
 
-    pMUXMsg->UIMUIMReadTransparentReq.TLV2Length = cpu_to_le16(3 +  pMUXMsg->UIMUIMReadTransparentReq.path_len);
+    pMUXMsg->UIMUIMReadTransparentReq.TLV2Length = cpu_to_le16(3 + pMUXMsg->UIMUIMReadTransparentReq.path_len);
 
     pReadTransparent = (PREAD_TRANSPARENT_TLV)(&pMUXMsg->UIMUIMReadTransparentReq.path[0] + pMUXMsg->UIMUIMReadTransparentReq.path_len);
     pReadTransparent->TLVType = 0x03;
@@ -338,7 +367,8 @@ static USHORT UimReadTransparentIMSIReqSend(PQMUX_MSG pMUXMsg, void *arg) {
 #endif
 
 #ifdef CONFIG_APN
-static USHORT WdsGetProfileSettingsReqSend(PQMUX_MSG pMUXMsg, void *arg) {
+static USHORT WdsGetProfileSettingsReqSend(PQMUX_MSG pMUXMsg, void *arg)
+{
     PROFILE_T *profile = (PROFILE_T *)arg;
     pMUXMsg->GetProfileSettingsReq.Length = cpu_to_le16(sizeof(QMIWDS_GET_PROFILE_SETTINGS_REQ_MSG) - 4);
     pMUXMsg->GetProfileSettingsReq.TLVType = 0x01;
@@ -348,7 +378,8 @@ static USHORT WdsGetProfileSettingsReqSend(PQMUX_MSG pMUXMsg, void *arg) {
     return sizeof(QMIWDS_GET_PROFILE_SETTINGS_REQ_MSG);
 }
 
-static USHORT WdsModifyProfileSettingsReq(PQMUX_MSG pMUXMsg, void *arg) {
+static USHORT WdsModifyProfileSettingsReq(PQMUX_MSG pMUXMsg, void *arg)
+{
     USHORT TLVLength = 0;
     UCHAR *pTLV;
     PROFILE_T *profile = (PROFILE_T *)arg;
@@ -365,24 +396,26 @@ static USHORT WdsModifyProfileSettingsReq(PQMUX_MSG pMUXMsg, void *arg) {
     pPdpType = (PQMIWDS_PDPTYPE)(pTLV + TLVLength);
     pPdpType->TLVType = 0x11;
     pPdpType->TLVLength = cpu_to_le16(0x01);
-// 0 ?C PDP-IP (IPv4)
-// 1 ?C PDP-PPP
-// 2 ?C PDP-IPv6
-// 3 ?C PDP-IPv4v6
+    // 0 ?C PDP-IP (IPv4)
+    // 1 ?C PDP-PPP
+    // 2 ?C PDP-IPv6
+    // 3 ?C PDP-IPv4v6
     pPdpType->PdpType = 3;
-    TLVLength +=(le16_to_cpu(pPdpType->TLVLength) + sizeof(QCQMICTL_TLV_HDR));
+    TLVLength += (le16_to_cpu(pPdpType->TLVLength) + sizeof(QCQMICTL_TLV_HDR));
 
     // Set APN Name
-    if (profile->apn) {
+    if (profile->apn)
+    {
         PQMIWDS_APNNAME pApnName = (PQMIWDS_APNNAME)(pTLV + TLVLength);
         pApnName->TLVType = 0x14;
         pApnName->TLVLength = cpu_to_le16(strlen(profile->apn));
         qstrcpy((char *)&pApnName->ApnName, profile->apn);
-        TLVLength +=(le16_to_cpu(pApnName->TLVLength) + sizeof(QCQMICTL_TLV_HDR));
+        TLVLength += (le16_to_cpu(pApnName->TLVLength) + sizeof(QCQMICTL_TLV_HDR));
     }
 
     // Set User Name
-    if (profile->user) {
+    if (profile->user)
+    {
         PQMIWDS_USERNAME pUserName = (PQMIWDS_USERNAME)(pTLV + TLVLength);
         pUserName->TLVType = 0x1B;
         pUserName->TLVLength = cpu_to_le16(strlen(profile->user));
@@ -391,16 +424,18 @@ static USHORT WdsModifyProfileSettingsReq(PQMUX_MSG pMUXMsg, void *arg) {
     }
 
     // Set Password
-    if (profile->password) {
+    if (profile->password)
+    {
         PQMIWDS_PASSWD pPasswd = (PQMIWDS_PASSWD)(pTLV + TLVLength);
         pPasswd->TLVType = 0x1C;
         pPasswd->TLVLength = cpu_to_le16(strlen(profile->password));
         qstrcpy((char *)&pPasswd->Passwd, profile->password);
-        TLVLength +=(le16_to_cpu(pPasswd->TLVLength) + sizeof(QCQMICTL_TLV_HDR));
+        TLVLength += (le16_to_cpu(pPasswd->TLVLength) + sizeof(QCQMICTL_TLV_HDR));
     }
 
     // Set Auth Protocol
-    if (profile->user && profile->password) {
+    if (profile->user && profile->password)
+    {
         PQMIWDS_AUTH_PREFERENCE pAuthPref = (PQMIWDS_AUTH_PREFERENCE)(pTLV + TLVLength);
         pAuthPref->TLVType = 0x1D;
         pAuthPref->TLVLength = cpu_to_le16(0x01);
@@ -412,16 +447,17 @@ static USHORT WdsModifyProfileSettingsReq(PQMUX_MSG pMUXMsg, void *arg) {
 }
 #endif
 
-static USHORT WdsGetRuntimeSettingReq(PQMUX_MSG pMUXMsg, void *arg) {
-   pMUXMsg->GetRuntimeSettingsReq.TLVType = 0x10;
-   pMUXMsg->GetRuntimeSettingsReq.TLVLength = cpu_to_le16(0x04);
-   // the following mask also applies to IPV6
-   pMUXMsg->GetRuntimeSettingsReq.Mask = cpu_to_le32(QMIWDS_GET_RUNTIME_SETTINGS_MASK_IPV4DNS_ADDR |
-                                          QMIWDS_GET_RUNTIME_SETTINGS_MASK_IPV4_ADDR |
-                                          QMIWDS_GET_RUNTIME_SETTINGS_MASK_MTU |
-                                          QMIWDS_GET_RUNTIME_SETTINGS_MASK_IPV4GATEWAY_ADDR); // |
-                                          // QMIWDS_GET_RUNTIME_SETTINGS_MASK_PCSCF_SV_ADDR |
-                                          // QMIWDS_GET_RUNTIME_SETTINGS_MASK_PCSCF_DOM_NAME;
+static USHORT WdsGetRuntimeSettingReq(PQMUX_MSG pMUXMsg, void *arg)
+{
+    pMUXMsg->GetRuntimeSettingsReq.TLVType = 0x10;
+    pMUXMsg->GetRuntimeSettingsReq.TLVLength = cpu_to_le16(0x04);
+    // the following mask also applies to IPV6
+    pMUXMsg->GetRuntimeSettingsReq.Mask = cpu_to_le32(QMIWDS_GET_RUNTIME_SETTINGS_MASK_IPV4DNS_ADDR |
+                                                      QMIWDS_GET_RUNTIME_SETTINGS_MASK_IPV4_ADDR |
+                                                      QMIWDS_GET_RUNTIME_SETTINGS_MASK_MTU |
+                                                      QMIWDS_GET_RUNTIME_SETTINGS_MASK_IPV4GATEWAY_ADDR); // |
+                                                                                                          // QMIWDS_GET_RUNTIME_SETTINGS_MASK_PCSCF_SV_ADDR |
+                                                                                                          // QMIWDS_GET_RUNTIME_SETTINGS_MASK_PCSCF_DOM_NAME;
 
     return sizeof(QMIWDS_GET_RUNTIME_SETTINGS_REQ_MSG);
 }
@@ -431,14 +467,18 @@ static PQCQMIMSG s_pResponse;
 static pthread_mutex_t s_commandmutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t s_commandcond = PTHREAD_COND_INITIALIZER;
 
-static int is_response(const PQCQMIMSG pRequest, const PQCQMIMSG pResponse) {
-    if ((pRequest->QMIHdr.QMIType == pResponse->QMIHdr.QMIType)
-        && (pRequest->QMIHdr.ClientId == pResponse->QMIHdr.ClientId)) {
-            USHORT requestTID, responseTID;
-        if (pRequest->QMIHdr.QMIType == QMUX_TYPE_CTL) {
+static int is_response(const PQCQMIMSG pRequest, const PQCQMIMSG pResponse)
+{
+    if ((pRequest->QMIHdr.QMIType == pResponse->QMIHdr.QMIType) && (pRequest->QMIHdr.ClientId == pResponse->QMIHdr.ClientId))
+    {
+        USHORT requestTID, responseTID;
+        if (pRequest->QMIHdr.QMIType == QMUX_TYPE_CTL)
+        {
             requestTID = pRequest->CTLMsg.QMICTLMsgHdr.TransactionId;
             responseTID = pResponse->CTLMsg.QMICTLMsgHdr.TransactionId;
-        } else {
+        }
+        else
+        {
             requestTID = le16_to_cpu(pRequest->MUXMsg.QMUXHdr.TransactionId);
             responseTID = le16_to_cpu(pResponse->MUXMsg.QMUXHdr.TransactionId);
         }
@@ -447,7 +487,8 @@ static int is_response(const PQCQMIMSG pRequest, const PQCQMIMSG pResponse) {
     return 0;
 }
 
-int QmiThreadSendQMITimeout(PQCQMIMSG pRequest, PQCQMIMSG *ppResponse, unsigned msecs) {
+int QmiThreadSendQMITimeout(PQCQMIMSG pRequest, PQCQMIMSG *ppResponse, unsigned msecs)
+{
     int ret;
 
     if (!pRequest)
@@ -470,18 +511,26 @@ int QmiThreadSendQMITimeout(PQCQMIMSG pRequest, PQCQMIMSG *ppResponse, unsigned 
     else
         ret = QmiWwanSendQMI(pRequest);
 
-    if (ret == 0) {
+    if (ret == 0)
+    {
         ret = pthread_cond_timeout_np(&s_commandcond, &s_commandmutex, msecs);
-        if (!ret) {
-            if (s_pResponse && ppResponse) {
+        if (!ret)
+        {
+            if (s_pResponse && ppResponse)
+            {
                 *ppResponse = s_pResponse;
-            } else {
-                if (s_pResponse) {
+            }
+            else
+            {
+                if (s_pResponse)
+                {
                     free(s_pResponse);
                     s_pResponse = NULL;
                 }
             }
-        } else {
+        }
+        else
+        {
             dbg_time("%s pthread_cond_timeout_np=%d, errno: %d (%s)", __func__, ret, errno, strerror(errno));
         }
     }
@@ -491,14 +540,18 @@ int QmiThreadSendQMITimeout(PQCQMIMSG pRequest, PQCQMIMSG *ppResponse, unsigned 
     return ret;
 }
 
-int QmiThreadSendQMI(PQCQMIMSG pRequest, PQCQMIMSG *ppResponse) {
+int QmiThreadSendQMI(PQCQMIMSG pRequest, PQCQMIMSG *ppResponse)
+{
     return QmiThreadSendQMITimeout(pRequest, ppResponse, 30 * 1000);
 }
 
-void QmiThreadRecvQMI(PQCQMIMSG pResponse) {
+void QmiThreadRecvQMI(PQCQMIMSG pResponse)
+{
     pthread_mutex_lock(&s_commandmutex);
-    if (pResponse == NULL) {
-        if (s_pRequest) {
+    if (pResponse == NULL)
+    {
+        if (s_pRequest)
+        {
             free(s_pRequest);
             s_pRequest = NULL;
             s_pResponse = NULL;
@@ -508,31 +561,39 @@ void QmiThreadRecvQMI(PQCQMIMSG pResponse) {
         return;
     }
     dump_qmi(pResponse, le16_to_cpu(pResponse->QMIHdr.Length) + 1);
-    if (s_pRequest && is_response(s_pRequest, pResponse)) {
+    if (s_pRequest && is_response(s_pRequest, pResponse))
+    {
         free(s_pRequest);
         s_pRequest = NULL;
         s_pResponse = malloc(le16_to_cpu(pResponse->QMIHdr.Length) + 1);
-        if (s_pResponse != NULL) {
+        if (s_pResponse != NULL)
+        {
             memcpy(s_pResponse, pResponse, le16_to_cpu(pResponse->QMIHdr.Length) + 1);
         }
         pthread_cond_signal(&s_commandcond);
-    } else if ((pResponse->QMIHdr.QMIType == QMUX_TYPE_NAS)
-                    && (le16_to_cpu(pResponse->MUXMsg.QMUXMsgHdrResp.Type) == QMINAS_SERVING_SYSTEM_IND)) {
+    }
+    else if ((pResponse->QMIHdr.QMIType == QMUX_TYPE_NAS) && (le16_to_cpu(pResponse->MUXMsg.QMUXMsgHdrResp.Type) == QMINAS_SERVING_SYSTEM_IND))
+    {
         qmidevice_send_event_to_main(RIL_UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED);
-    } else if ((pResponse->QMIHdr.QMIType == QMUX_TYPE_WDS)
-                    && (le16_to_cpu(pResponse->MUXMsg.QMUXMsgHdrResp.Type) == QMIWDS_GET_PKT_SRVC_STATUS_IND)) {
+    }
+    else if ((pResponse->QMIHdr.QMIType == QMUX_TYPE_WDS) && (le16_to_cpu(pResponse->MUXMsg.QMUXMsgHdrResp.Type) == QMIWDS_GET_PKT_SRVC_STATUS_IND))
+    {
         qmidevice_send_event_to_main(RIL_UNSOL_DATA_CALL_LIST_CHANGED);
-    } else if ((pResponse->QMIHdr.QMIType == QMUX_TYPE_NAS)
-                    && (le16_to_cpu(pResponse->MUXMsg.QMUXMsgHdrResp.Type) == QMINAS_SYS_INFO_IND)) {
+    }
+    else if ((pResponse->QMIHdr.QMIType == QMUX_TYPE_NAS) && (le16_to_cpu(pResponse->MUXMsg.QMUXMsgHdrResp.Type) == QMINAS_SYS_INFO_IND))
+    {
         qmidevice_send_event_to_main(RIL_UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED);
-    } else {
+    }
+    else
+    {
         if (debug_qmi)
             dbg_time("nobody care this qmi msg!!");
     }
     pthread_mutex_unlock(&s_commandmutex);
 }
 
-int requestSetEthMode(PROFILE_T *profile) {
+int requestSetEthMode(PROFILE_T *profile)
+{
     PQCQMIMSG pRequest;
     PQCQMIMSG pResponse;
     PQMUX_MSG pMUXMsg;
@@ -540,41 +601,48 @@ int requestSetEthMode(PROFILE_T *profile) {
     PQMIWDS_ADMIN_SET_DATA_FORMAT_TLV linkProto;
     UCHAR autoconnect_setting = 0;
 
-    if (profile->IsDualIPSupported) {
+    if (profile->IsDualIPSupported)
+    {
         UCHAR IpPreference;
 
         IpPreference = IpFamilyV4;
         pRequest = ComposeQMUXMsg(QMUX_TYPE_WDS, QMIWDS_SET_CLIENT_IP_FAMILY_PREF_REQ, WdsSetClientIPFamilyPref, (void *)&IpPreference);
         QmiThreadSendQMI(pRequest, &pResponse);
-        if (pResponse) free(pResponse);
+        if (pResponse)
+            free(pResponse);
 
         IpPreference = IpFamilyV6;
         pRequest = ComposeQMUXMsg(QMUX_TYPE_WDS_IPV6, QMIWDS_SET_CLIENT_IP_FAMILY_PREF_REQ, WdsSetClientIPFamilyPref, (void *)&IpPreference);
         QmiThreadSendQMI(pRequest, &pResponse);
-        if (pResponse) free(pResponse);
+        if (pResponse)
+            free(pResponse);
     }
-    
-    pRequest = ComposeQMUXMsg(QMUX_TYPE_WDS, QMIWDS_SET_AUTO_CONNECT_REQ , WdsSetAutoConnect, (void *)&autoconnect_setting);
+
+    pRequest = ComposeQMUXMsg(QMUX_TYPE_WDS, QMIWDS_SET_AUTO_CONNECT_REQ, WdsSetAutoConnect, (void *)&autoconnect_setting);
     QmiThreadSendQMI(pRequest, &pResponse);
-    if (pResponse) free(pResponse);
+    if (pResponse)
+        free(pResponse);
 
     pRequest = ComposeQMUXMsg(QMUX_TYPE_WDS_ADMIN, QMIWDS_ADMIN_SET_DATA_FORMAT_REQ, WdaSetDataFormat, NULL);
     err = QmiThreadSendQMI(pRequest, &pResponse);
 
-    if (err < 0 || pResponse == NULL) {
+    if (err < 0 || pResponse == NULL)
+    {
         dbg_time("%s err = %d", __func__, err);
         return err;
     }
 
     pMUXMsg = &pResponse->MUXMsg;
-    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError)) {
+    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError))
+    {
         dbg_time("%s QMUXResult = 0x%x, QMUXError = 0x%x", __func__,
-            le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
+                 le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
         return le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError);
     }
 
     linkProto = (PQMIWDS_ADMIN_SET_DATA_FORMAT_TLV)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, 0x11);
-    if (linkProto != NULL) {
+    if (linkProto != NULL)
+    {
         profile->rawIP = (le32_to_cpu(linkProto->Value) == 2);
         s_9x07 = profile->rawIP;
     }
@@ -584,7 +652,8 @@ int requestSetEthMode(PROFILE_T *profile) {
 }
 
 #ifdef CONFIG_SIM
-int requestGetPINStatus(SIM_Status *pSIMStatus) {
+int requestGetPINStatus(SIM_Status *pSIMStatus)
+{
     PQCQMIMSG pRequest;
     PQCQMIMSG pResponse;
     PQMUX_MSG pMUXMsg;
@@ -598,27 +667,35 @@ int requestGetPINStatus(SIM_Status *pSIMStatus) {
         pRequest = ComposeQMUXMsg(QMUX_TYPE_DMS, QMIDMS_UIM_GET_PIN_STATUS_REQ, NULL, NULL);
     err = QmiThreadSendQMI(pRequest, &pResponse);
 
-    if (err < 0 || pResponse == NULL) {
+    if (err < 0 || pResponse == NULL)
+    {
         dbg_time("%s err = %d", __func__, err);
         return err;
     }
 
     pMUXMsg = &pResponse->MUXMsg;
-    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError)) {
+    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError))
+    {
         dbg_time("%s QMUXResult = 0x%x, QMUXError = 0x%x", __func__,
-            le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
+                 le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
         return le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError);
     }
 
     pPin1Status = (PQMIDMS_UIM_PIN_STATUS)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, 0x11);
     //pPin2Status = (PQMIDMS_UIM_PIN_STATUS)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, 0x12);
 
-    if (pPin1Status != NULL) {
-        if (pPin1Status->PINStatus == QMI_PIN_STATUS_NOT_VERIF) {
+    if (pPin1Status != NULL)
+    {
+        if (pPin1Status->PINStatus == QMI_PIN_STATUS_NOT_VERIF)
+        {
             *pSIMStatus = SIM_PIN;
-        } else if (pPin1Status->PINStatus == QMI_PIN_STATUS_BLOCKED) {
+        }
+        else if (pPin1Status->PINStatus == QMI_PIN_STATUS_BLOCKED)
+        {
             *pSIMStatus = SIM_PUK;
-        } else if (pPin1Status->PINStatus == QMI_PIN_STATUS_PERM_BLOCKED) {
+        }
+        else if (pPin1Status->PINStatus == QMI_PIN_STATUS_PERM_BLOCKED)
+        {
             *pSIMStatus = SIM_BAD;
         }
     }
@@ -627,19 +704,19 @@ int requestGetPINStatus(SIM_Status *pSIMStatus) {
     return 0;
 }
 
-int requestGetSIMStatus(SIM_Status *pSIMStatus) { //RIL_REQUEST_GET_SIM_STATUS
+int requestGetSIMStatus(SIM_Status *pSIMStatus)
+{ //RIL_REQUEST_GET_SIM_STATUS
     PQCQMIMSG pRequest;
     PQCQMIMSG pResponse;
     PQMUX_MSG pMUXMsg;
     int err;
-    const char * SIM_Status_String[] = {
+    const char *SIM_Status_String[] = {
         "SIM_ABSENT",
         "SIM_NOT_READY",
         "SIM_READY", /* SIM_READY means the radio state is RADIO_STATE_SIM_READY */
         "SIM_PIN",
         "SIM_PUK",
-        "SIM_NETWORK_PERSONALIZATION"
-    };
+        "SIM_NETWORK_PERSONALIZATION"};
 
 __requestGetSIMStatus:
     if (s_9x07 && qmiclientId[QMUX_TYPE_UIM])
@@ -649,16 +726,19 @@ __requestGetSIMStatus:
 
     err = QmiThreadSendQMI(pRequest, &pResponse);
 
-    if (err < 0 || pResponse == NULL) {
+    if (err < 0 || pResponse == NULL)
+    {
         dbg_time("%s err = %d", __func__, err);
         return err;
     }
 
     pMUXMsg = &pResponse->MUXMsg;
-    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError)) {
+    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError))
+    {
         dbg_time("%s QMUXResult = 0x%x, QMUXError = 0x%x", __func__,
-            le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
-        if (QMI_ERR_OP_DEVICE_UNSUPPORTED == le16_to_cpu(pResponse->MUXMsg.QMUXMsgHdrResp.QMUXError)) {
+                 le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
+        if (QMI_ERR_OP_DEVICE_UNSUPPORTED == le16_to_cpu(pResponse->MUXMsg.QMUXMsgHdrResp.QMUXError))
+        {
             sleep(1);
             goto __requestGetSIMStatus;
         }
@@ -682,18 +762,18 @@ __requestGetSIMStatus:
         if (pCardStatus != NULL)
         {
             pPINState = (PQMIUIM_PIN_STATE)((PUCHAR)pCardStatus + sizeof(QMIUIM_CARD_STATUS) + pCardStatus->AIDLength);
-            CardState  = pCardStatus->CardState;
+            CardState = pCardStatus->CardState;
             if (pPINState->UnivPIN == 1)
             {
-               PIN1State = pCardStatus->UPINState;
-               //PIN1Retries = pCardStatus->UPINRetries;
-               //PUK1Retries = pCardStatus->UPUKRetries;
+                PIN1State = pCardStatus->UPINState;
+                //PIN1Retries = pCardStatus->UPINRetries;
+                //PUK1Retries = pCardStatus->UPUKRetries;
             }
             else
             {
-               PIN1State = pPINState->PIN1State;
-               //PIN1Retries = pPINState->PIN1Retries;
-               //PUK1Retries = pPINState->PUK1Retries;
+                PIN1State = pPINState->PIN1State;
+                //PIN1Retries = pPINState->PIN1Retries;
+                //PUK1Retries = pPINState->PUK1Retries;
             }
             //PIN2State = pPINState->PIN2State;
             //PIN2Retries = pPINState->PIN2Retries;
@@ -701,7 +781,7 @@ __requestGetSIMStatus:
         }
 
         *pSIMStatus = SIM_ABSENT;
-        if ((CardState == 0x01) &&  ((PIN1State == QMI_PIN_STATUS_VERIFIED)|| (PIN1State == QMI_PIN_STATUS_DISABLED)))
+        if ((CardState == 0x01) && ((PIN1State == QMI_PIN_STATUS_VERIFIED) || (PIN1State == QMI_PIN_STATUS_DISABLED)))
         {
             *pSIMStatus = SIM_READY;
         }
@@ -711,7 +791,7 @@ __requestGetSIMStatus:
             {
                 *pSIMStatus = SIM_PIN;
             }
-            if ( PIN1State == QMI_PIN_STATUS_BLOCKED)
+            if (PIN1State == QMI_PIN_STATUS_BLOCKED)
             {
                 *pSIMStatus = SIM_PUK;
             }
@@ -733,21 +813,28 @@ __requestGetSIMStatus:
     }
     else
     {
-    //UIM state. Values:
-    // 0x00  UIM initialization completed
-    // 0x01  UIM is locked or the UIM failed
-    // 0x02  UIM is not present
-    // 0x03  Reserved
-    // 0xFF  UIM state is currently
-    //unavailable
-        if (pResponse->MUXMsg.UIMGetStateResp.UIMState == 0x00) {
+        //UIM state. Values:
+        // 0x00  UIM initialization completed
+        // 0x01  UIM is locked or the UIM failed
+        // 0x02  UIM is not present
+        // 0x03  Reserved
+        // 0xFF  UIM state is currently
+        //unavailable
+        if (pResponse->MUXMsg.UIMGetStateResp.UIMState == 0x00)
+        {
             *pSIMStatus = SIM_READY;
-        } else if (pResponse->MUXMsg.UIMGetStateResp.UIMState == 0x01) {
+        }
+        else if (pResponse->MUXMsg.UIMGetStateResp.UIMState == 0x01)
+        {
             *pSIMStatus = SIM_ABSENT;
             err = requestGetPINStatus(pSIMStatus);
-        } else if ((pResponse->MUXMsg.UIMGetStateResp.UIMState == 0x02) || (pResponse->MUXMsg.UIMGetStateResp.UIMState == 0xFF)) {
+        }
+        else if ((pResponse->MUXMsg.UIMGetStateResp.UIMState == 0x02) || (pResponse->MUXMsg.UIMGetStateResp.UIMState == 0xFF))
+        {
             *pSIMStatus = SIM_ABSENT;
-        } else {
+        }
+        else
+        {
             *pSIMStatus = SIM_ABSENT;
         }
     }
@@ -758,7 +845,8 @@ __requestGetSIMStatus:
     return 0;
 }
 
-int requestEnterSimPin(const CHAR *pPinCode) {
+int requestEnterSimPin(const CHAR *pPinCode)
+{
     PQCQMIMSG pRequest;
     PQCQMIMSG pResponse;
     PQMUX_MSG pMUXMsg;
@@ -770,15 +858,17 @@ int requestEnterSimPin(const CHAR *pPinCode) {
         pRequest = ComposeQMUXMsg(QMUX_TYPE_DMS, QMIDMS_UIM_VERIFY_PIN_REQ, DmsUIMVerifyPinReqSend, (void *)pPinCode);
     err = QmiThreadSendQMI(pRequest, &pResponse);
 
-    if (err < 0 || pResponse == NULL) {
+    if (err < 0 || pResponse == NULL)
+    {
         dbg_time("%s err = %d", __func__, err);
         return err;
     }
 
     pMUXMsg = &pResponse->MUXMsg;
-    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError)) {
+    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError))
+    {
         dbg_time("%s QMUXResult = 0x%x, QMUXError = 0x%x", __func__,
-            le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
+                 le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
         return le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError);
     }
 
@@ -787,39 +877,47 @@ int requestEnterSimPin(const CHAR *pPinCode) {
 }
 
 #ifdef CONFIG_IMSI_ICCID
-int requestGetICCID(void) { //RIL_REQUEST_GET_IMSI
+int requestGetICCID(void)
+{ //RIL_REQUEST_GET_IMSI
     PQCQMIMSG pRequest;
     PQCQMIMSG pResponse;
     PQMUX_MSG pMUXMsg;
     PQMIUIM_CONTENT pUimContent;
     int err;
 
-    if (s_9x07 && qmiclientId[QMUX_TYPE_UIM]) {
+    if (s_9x07 && qmiclientId[QMUX_TYPE_UIM])
+    {
         pRequest = ComposeQMUXMsg(QMUX_TYPE_UIM, QMIUIM_READ_TRANSPARENT_REQ, UimReadTransparentIMSIReqSend, (void *)"EF_ICCID");
         err = QmiThreadSendQMI(pRequest, &pResponse);
-    } else {
+    }
+    else
+    {
         return 0;
     }
 
-    if (err < 0 || pResponse == NULL) {
+    if (err < 0 || pResponse == NULL)
+    {
         dbg_time("%s err = %d", __func__, err);
         return err;
     }
 
     pMUXMsg = &pResponse->MUXMsg;
-    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError)) {
+    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError))
+    {
         dbg_time("%s QMUXResult = 0x%x, QMUXError = 0x%x", __func__,
-            le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
+                 le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
         return le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError);
     }
 
     pUimContent = (PQMIUIM_CONTENT)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, 0x11);
-    if (pUimContent != NULL) {
+    if (pUimContent != NULL)
+    {
         static char DeviceICCID[32] = {'\0'};
         int i = 0, j = 0;
 
-        for (i = 0, j = 0; i < le16_to_cpu(pUimContent->content_len); ++i) {
-            if  ((pUimContent->content[i] & 0x0F) >= 0x0A)
+        for (i = 0, j = 0; i < le16_to_cpu(pUimContent->content_len); ++i)
+        {
+            if ((pUimContent->content[i] & 0x0F) >= 0x0A)
                 DeviceICCID[j++] = 'A' + (pUimContent->content[i] & 0x0F);
             else
                 DeviceICCID[j++] = '0' + (pUimContent->content[i] & 0x0F);
@@ -838,41 +936,49 @@ int requestGetICCID(void) { //RIL_REQUEST_GET_IMSI
     return 0;
 }
 
-int requestGetIMSI(void) { //RIL_REQUEST_GET_IMSI
+int requestGetIMSI(void)
+{ //RIL_REQUEST_GET_IMSI
     PQCQMIMSG pRequest;
     PQCQMIMSG pResponse;
     PQMUX_MSG pMUXMsg;
     PQMIUIM_CONTENT pUimContent;
     int err;
 
-    if (s_9x07 && qmiclientId[QMUX_TYPE_UIM]) {
+    if (s_9x07 && qmiclientId[QMUX_TYPE_UIM])
+    {
         pRequest = ComposeQMUXMsg(QMUX_TYPE_UIM, QMIUIM_READ_TRANSPARENT_REQ, UimReadTransparentIMSIReqSend, (void *)"EF_IMSI");
         err = QmiThreadSendQMI(pRequest, &pResponse);
-    } else {
+    }
+    else
+    {
         return 0;
     }
 
-    if (err < 0 || pResponse == NULL) {
+    if (err < 0 || pResponse == NULL)
+    {
         dbg_time("%s err = %d", __func__, err);
         return err;
     }
 
     pMUXMsg = &pResponse->MUXMsg;
-    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError)) {
+    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError))
+    {
         dbg_time("%s QMUXResult = 0x%x, QMUXError = 0x%x", __func__,
-            le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
+                 le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
         return le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError);
     }
 
     pUimContent = (PQMIUIM_CONTENT)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, 0x11);
-    if (pUimContent != NULL) {
+    if (pUimContent != NULL)
+    {
         static char DeviceIMSI[32] = {'\0'};
         int i = 0, j = 0;
 
-        for (i = 0, j = 0; i < le16_to_cpu(pUimContent->content[0]); ++i) {
+        for (i = 0, j = 0; i < le16_to_cpu(pUimContent->content[0]); ++i)
+        {
             if (i != 0)
-                DeviceIMSI[j++] = (pUimContent->content[i+1] & 0x0F) + '0';
-            DeviceIMSI[j++] = ((pUimContent->content[i+1] & 0xF0) >> 0x04) + '0';
+                DeviceIMSI[j++] = (pUimContent->content[i + 1] & 0x0F) + '0';
+            DeviceIMSI[j++] = ((pUimContent->content[i + 1] & 0xF0) >> 0x04) + '0';
         }
         DeviceIMSI[j] = '\0';
 
@@ -886,70 +992,71 @@ int requestGetIMSI(void) { //RIL_REQUEST_GET_IMSI
 #endif
 
 #if 1
-static void quectel_convert_cdma_mcc_2_ascii_mcc( USHORT *p_mcc, USHORT mcc )
+static void quectel_convert_cdma_mcc_2_ascii_mcc(USHORT *p_mcc, USHORT mcc)
 {
-  unsigned int d1, d2, d3, buf = mcc + 111;
+    unsigned int d1, d2, d3, buf = mcc + 111;
 
-  if ( mcc == 0x3FF ) // wildcard
-  {
-    *p_mcc = 3;
-  }
-  else
-  {
-    d3 = buf % 10;
-    buf = ( d3 == 0 ) ? (buf-10)/10 : buf/10;
-
-    d2 = buf % 10;
-    buf = ( d2 == 0 ) ? (buf-10)/10 : buf/10;
-
-    d1 = ( buf == 10 ) ? 0 : buf;
-
-//dbg_time("d1:%d, d2:%d,d3:%d",d1,d2,d3);
-    if ( d1<10 && d2<10 && d3<10 )
+    if (mcc == 0x3FF) // wildcard
     {
-    *p_mcc = d1*100+d2*10+d3;
+        *p_mcc = 3;
+    }
+    else
+    {
+        d3 = buf % 10;
+        buf = (d3 == 0) ? (buf - 10) / 10 : buf / 10;
+
+        d2 = buf % 10;
+        buf = (d2 == 0) ? (buf - 10) / 10 : buf / 10;
+
+        d1 = (buf == 10) ? 0 : buf;
+
+        //dbg_time("d1:%d, d2:%d,d3:%d",d1,d2,d3);
+        if (d1 < 10 && d2 < 10 && d3 < 10)
+        {
+            *p_mcc = d1 * 100 + d2 * 10 + d3;
 #if 0
       *(p_mcc+0) = '0' + d1;
       *(p_mcc+1) = '0' + d2;
       *(p_mcc+2) = '0' + d3;
 #endif
+        }
+        else
+        {
+            //dbg_time( "invalid digits %d %d %d", d1, d2, d3 );
+            *p_mcc = 0;
+        }
     }
-    else
-    {
-      //dbg_time( "invalid digits %d %d %d", d1, d2, d3 );
-      *p_mcc = 0;
-    }
-  }
 }
 
-static void quectel_convert_cdma_mnc_2_ascii_mnc( USHORT *p_mnc, USHORT imsi_11_12)
+static void quectel_convert_cdma_mnc_2_ascii_mnc(USHORT *p_mnc, USHORT imsi_11_12)
 {
-  unsigned int d1, d2, buf = imsi_11_12 + 11;
+    unsigned int d1, d2, buf = imsi_11_12 + 11;
 
-  if ( imsi_11_12 == 0x7F ) // wildcard
-  {
-    *p_mnc = 7;
-  }
-  else
-  {
-    d2 = buf % 10;
-    buf = ( d2 == 0 ) ? (buf-10)/10 : buf/10;
-
-    d1 = ( buf == 10 ) ? 0 : buf;
-
-    if ( d1<10 && d2<10 )
+    if (imsi_11_12 == 0x7F) // wildcard
     {
-     *p_mnc = d1*10 + d2;
+        *p_mnc = 7;
     }
     else
     {
-      //dbg_time( "invalid digits %d %d", d1, d2, 0 );
-      *p_mnc = 0;
+        d2 = buf % 10;
+        buf = (d2 == 0) ? (buf - 10) / 10 : buf / 10;
+
+        d1 = (buf == 10) ? 0 : buf;
+
+        if (d1 < 10 && d2 < 10)
+        {
+            *p_mnc = d1 * 10 + d2;
+        }
+        else
+        {
+            //dbg_time( "invalid digits %d %d", d1, d2, 0 );
+            *p_mnc = 0;
+        }
     }
-  }
 }
 
-int requestGetHomeNetwork(USHORT *p_mcc, USHORT *p_mnc, USHORT *p_sid, USHORT *p_nid) {
+int requestGetHomeNetwork(USHORT *p_mcc, USHORT *p_mnc, USHORT *p_sid, USHORT *p_nid)
+{
     PQCQMIMSG pRequest;
     PQCQMIMSG pResponse;
     PQMUX_MSG pMUXMsg;
@@ -960,27 +1067,31 @@ int requestGetHomeNetwork(USHORT *p_mcc, USHORT *p_mnc, USHORT *p_sid, USHORT *p
     pRequest = ComposeQMUXMsg(QMUX_TYPE_NAS, QMINAS_GET_HOME_NETWORK_REQ, NULL, NULL);
     err = QmiThreadSendQMI(pRequest, &pResponse);
 
-    if (err < 0 || pResponse == NULL) {
+    if (err < 0 || pResponse == NULL)
+    {
         dbg_time("%s err = %d", __func__, err);
         return err;
     }
 
     pMUXMsg = &pResponse->MUXMsg;
-    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError)) {
+    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError))
+    {
         dbg_time("%s QMUXResult = 0x%x, QMUXError = 0x%x", __func__,
-            le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
+                 le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
         return le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError);
     }
 
     pHomeNetwork = (PHOME_NETWORK)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, 0x01);
-    if (pHomeNetwork && p_mcc && p_mnc ) {
+    if (pHomeNetwork && p_mcc && p_mnc)
+    {
         *p_mcc = le16_to_cpu(pHomeNetwork->MobileCountryCode);
         *p_mnc = le16_to_cpu(pHomeNetwork->MobileNetworkCode);
         //dbg_time("%s MobileCountryCode: %d, MobileNetworkCode: %d", __func__, *pMobileCountryCode, *pMobileNetworkCode);
     }
 
     pHomeNetworkSystemID = (PHOME_NETWORK_SYSTEMID)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, 0x10);
-    if (pHomeNetworkSystemID && p_sid && p_nid) {
+    if (pHomeNetworkSystemID && p_sid && p_nid)
+    {
         *p_sid = le16_to_cpu(pHomeNetworkSystemID->SystemID); //china-hefei: sid 14451
         *p_nid = le16_to_cpu(pHomeNetworkSystemID->NetworkID);
         //dbg_time("%s SystemID: %d, NetworkID: %d", __func__, *pSystemID, *pNetworkID);
@@ -1123,15 +1234,18 @@ struct wwan_data_class_str class2str[] = {
 CHAR *wwan_data_class2str(ULONG class)
 {
     unsigned int i = 0;
-    for (i = 0; i < sizeof(class2str)/sizeof(class2str[0]); i++) {
-        if (class2str[i].class == class) {
+    for (i = 0; i < sizeof(class2str) / sizeof(class2str[0]); i++)
+    {
+        if (class2str[i].class == class)
+        {
             return class2str[i].str;
         }
     }
     return "UNKNOWN";
 }
 
-int requestRegistrationState2(UCHAR *pPSAttachedState) {
+int requestRegistrationState2(UCHAR *pPSAttachedState)
+{
     PQCQMIMSG pRequest;
     PQCQMIMSG pResponse;
     PQMUX_MSG pMUXMsg;
@@ -1155,15 +1269,17 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
     pRequest = ComposeQMUXMsg(QMUX_TYPE_NAS, QMINAS_GET_SYS_INFO_REQ, NULL, NULL);
     err = QmiThreadSendQMI(pRequest, &pResponse);
 
-    if (err < 0 || pResponse == NULL) {
+    if (err < 0 || pResponse == NULL)
+    {
         dbg_time("%s err = %d", __func__, err);
         return err;
     }
 
     pMUXMsg = &pResponse->MUXMsg;
-    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError)) {
+    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError))
+    {
         dbg_time("%s QMUXResult = 0x%x, QMUXError = 0x%x", __func__,
-            le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
+                 le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
         return le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError);
     }
 
@@ -1172,42 +1288,49 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
 
     s_is_cdma = 0;
     s_hdr_personality = 0;
-    while (remainingLen > 0) {
-        switch (pServiceStatusInfo->TLVType) {
+    while (remainingLen > 0)
+    {
+        switch (pServiceStatusInfo->TLVType)
+        {
         case 0x10: // CDMA
-            if (pServiceStatusInfo->SrvStatus == 0x02) {
-                DataCapList = WWAN_DATA_CLASS_1XRTT|
-                              WWAN_DATA_CLASS_1XEVDO|
-                              WWAN_DATA_CLASS_1XEVDO_REVA|
-                              WWAN_DATA_CLASS_1XEVDV|
+            if (pServiceStatusInfo->SrvStatus == 0x02)
+            {
+                DataCapList = WWAN_DATA_CLASS_1XRTT |
+                              WWAN_DATA_CLASS_1XEVDO |
+                              WWAN_DATA_CLASS_1XEVDO_REVA |
+                              WWAN_DATA_CLASS_1XEVDV |
                               WWAN_DATA_CLASS_1XEVDO_REVB;
                 DeviceClass = DEVICE_CLASS_CDMA;
                 s_is_cdma = (0 == is_lte);
             }
             break;
         case 0x11: // HDR
-            if (pServiceStatusInfo->SrvStatus == 0x02) {
-                DataCapList = WWAN_DATA_CLASS_3XRTT|
+            if (pServiceStatusInfo->SrvStatus == 0x02)
+            {
+                DataCapList = WWAN_DATA_CLASS_3XRTT |
                               WWAN_DATA_CLASS_UMB;
                 DeviceClass = DEVICE_CLASS_CDMA;
                 s_is_cdma = (0 == is_lte);
             }
             break;
         case 0x12: // GSM
-            if (pServiceStatusInfo->SrvStatus == 0x02) {
-                DataCapList = WWAN_DATA_CLASS_GPRS|
+            if (pServiceStatusInfo->SrvStatus == 0x02)
+            {
+                DataCapList = WWAN_DATA_CLASS_GPRS |
                               WWAN_DATA_CLASS_EDGE;
                 DeviceClass = DEVICE_CLASS_GSM;
             }
             break;
         case 0x13: // WCDMA
-            if (pServiceStatusInfo->SrvStatus == 0x02) {
+            if (pServiceStatusInfo->SrvStatus == 0x02)
+            {
                 DataCapList = WWAN_DATA_CLASS_UMTS;
                 DeviceClass = DEVICE_CLASS_GSM;
             }
             break;
         case 0x14: // LTE
-            if (pServiceStatusInfo->SrvStatus == 0x02) {
+            if (pServiceStatusInfo->SrvStatus == 0x02)
+            {
                 DataCapList = WWAN_DATA_CLASS_LTE;
                 DeviceClass = DEVICE_CLASS_GSM;
                 is_lte = 1;
@@ -1215,16 +1338,19 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
             }
             break;
         case 0x24: // TDSCDMA
-            if (pServiceStatusInfo->SrvStatus == 0x02) {
+            if (pServiceStatusInfo->SrvStatus == 0x02)
+            {
                 pDataCapStr = "TD-SCDMA";
             }
             break;
         case 0x15: // CDMA
             // CDMA_SYSTEM_INFO
             pCdmaSystemInfo = (PCDMA_SYSTEM_INFO)pServiceStatusInfo;
-            if (pCdmaSystemInfo->SrvDomainValid == 0x01) {
+            if (pCdmaSystemInfo->SrvDomainValid == 0x01)
+            {
                 *pPSAttachedState = 0;
-                if (pCdmaSystemInfo->SrvDomain & 0x02) {
+                if (pCdmaSystemInfo->SrvDomain & 0x02)
+                {
                     *pPSAttachedState = 1;
                     s_is_cdma = (0 == is_lte);
                 }
@@ -1238,13 +1364,16 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
                 }
             }
 #endif
-            if (pCdmaSystemInfo->NetworkIdValid == 0x01) {
+            if (pCdmaSystemInfo->NetworkIdValid == 0x01)
+            {
                 int i;
                 CHAR temp[10];
                 strncpy(temp, (CHAR *)pCdmaSystemInfo->MCC, 3);
                 temp[3] = '\0';
-                for (i = 0; i < 4; i++) {
-                    if ((UCHAR)temp[i] == 0xFF) {
+                for (i = 0; i < 4; i++)
+                {
+                    if ((UCHAR)temp[i] == 0xFF)
+                    {
                         temp[i] = '\0';
                     }
                 }
@@ -1252,8 +1381,10 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
 
                 strncpy(temp, (CHAR *)pCdmaSystemInfo->MNC, 3);
                 temp[3] = '\0';
-                for (i = 0; i < 4; i++) {
-                    if ((UCHAR)temp[i] == 0xFF) {
+                for (i = 0; i < 4; i++)
+                {
+                    if ((UCHAR)temp[i] == 0xFF)
+                    {
                         temp[i] = '\0';
                     }
                 }
@@ -1263,9 +1394,11 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
         case 0x16: // HDR
             // HDR_SYSTEM_INFO
             pHdrSystemInfo = (PHDR_SYSTEM_INFO)pServiceStatusInfo;
-            if (pHdrSystemInfo->SrvDomainValid == 0x01) {
+            if (pHdrSystemInfo->SrvDomainValid == 0x01)
+            {
                 *pPSAttachedState = 0;
-                if (pHdrSystemInfo->SrvDomain & 0x02) {
+                if (pHdrSystemInfo->SrvDomain & 0x02)
+                {
                     *pPSAttachedState = 1;
                     s_is_cdma = (0 == is_lte);
                 }
@@ -1279,14 +1412,16 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
                 }
             }
 #endif
-            if (*pPSAttachedState && pHdrSystemInfo->HdrPersonalityValid == 0x01) {
+            if (*pPSAttachedState && pHdrSystemInfo->HdrPersonalityValid == 0x01)
+            {
                 if (pHdrSystemInfo->HdrPersonality == 0x03)
                     s_hdr_personality = 0x02;
                 //else if (pHdrSystemInfo->HdrPersonality == 0x02)
                 //    s_hdr_personality = 0x01;
             }
             USHORT cmda_mcc = 0, cdma_mnc = 0;
-            if(!requestGetHomeNetwork(&cmda_mcc, &cdma_mnc,NULL, NULL) && cmda_mcc) {
+            if (!requestGetHomeNetwork(&cmda_mcc, &cdma_mnc, NULL, NULL) && cmda_mcc)
+            {
                 quectel_convert_cdma_mcc_2_ascii_mcc(&MobileCountryCode, cmda_mcc);
                 quectel_convert_cdma_mnc_2_ascii_mnc(&MobileNetworkCode, cdma_mnc);
             }
@@ -1294,9 +1429,11 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
         case 0x17: // GSM
             // GSM_SYSTEM_INFO
             pGsmSystemInfo = (PGSM_SYSTEM_INFO)pServiceStatusInfo;
-            if (pGsmSystemInfo->SrvDomainValid == 0x01) {
+            if (pGsmSystemInfo->SrvDomainValid == 0x01)
+            {
                 *pPSAttachedState = 0;
-                if (pGsmSystemInfo->SrvDomain & 0x02) {
+                if (pGsmSystemInfo->SrvDomain & 0x02)
+                {
                     *pPSAttachedState = 1;
                 }
             }
@@ -1308,13 +1445,16 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
                 }
             }
 #endif
-            if (pGsmSystemInfo->NetworkIdValid == 0x01) {
+            if (pGsmSystemInfo->NetworkIdValid == 0x01)
+            {
                 int i;
                 CHAR temp[10];
                 strncpy(temp, (CHAR *)pGsmSystemInfo->MCC, 3);
                 temp[3] = '\0';
-                for (i = 0; i < 4; i++) {
-                    if ((UCHAR)temp[i] == 0xFF) {
+                for (i = 0; i < 4; i++)
+                {
+                    if ((UCHAR)temp[i] == 0xFF)
+                    {
                         temp[i] = '\0';
                     }
                 }
@@ -1322,8 +1462,10 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
 
                 strncpy(temp, (CHAR *)pGsmSystemInfo->MNC, 3);
                 temp[3] = '\0';
-                for (i = 0; i < 4; i++) {
-                    if ((UCHAR)temp[i] == 0xFF) {
+                for (i = 0; i < 4; i++)
+                {
+                    if ((UCHAR)temp[i] == 0xFF)
+                    {
                         temp[i] = '\0';
                     }
                 }
@@ -1333,9 +1475,11 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
         case 0x18: // WCDMA
             // WCDMA_SYSTEM_INFO
             pWcdmaSystemInfo = (PWCDMA_SYSTEM_INFO)pServiceStatusInfo;
-            if (pWcdmaSystemInfo->SrvDomainValid == 0x01) {
+            if (pWcdmaSystemInfo->SrvDomainValid == 0x01)
+            {
                 *pPSAttachedState = 0;
-                if (pWcdmaSystemInfo->SrvDomain & 0x02) {
+                if (pWcdmaSystemInfo->SrvDomain & 0x02)
+                {
                     *pPSAttachedState = 1;
                 }
             }
@@ -1347,13 +1491,16 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
                 }
             }
 #endif
-            if (pWcdmaSystemInfo->NetworkIdValid == 0x01) {
+            if (pWcdmaSystemInfo->NetworkIdValid == 0x01)
+            {
                 int i;
                 CHAR temp[10];
                 strncpy(temp, (CHAR *)pWcdmaSystemInfo->MCC, 3);
                 temp[3] = '\0';
-                for (i = 0; i < 4; i++) {
-                    if ((UCHAR)temp[i] == 0xFF) {
+                for (i = 0; i < 4; i++)
+                {
+                    if ((UCHAR)temp[i] == 0xFF)
+                    {
                         temp[i] = '\0';
                     }
                 }
@@ -1361,8 +1508,10 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
 
                 strncpy(temp, (CHAR *)pWcdmaSystemInfo->MNC, 3);
                 temp[3] = '\0';
-                for (i = 0; i < 4; i++) {
-                    if ((UCHAR)temp[i] == 0xFF) {
+                for (i = 0; i < 4; i++)
+                {
+                    if ((UCHAR)temp[i] == 0xFF)
+                    {
                         temp[i] = '\0';
                     }
                 }
@@ -1372,9 +1521,11 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
         case 0x19: // LTE_SYSTEM_INFO
             // LTE_SYSTEM_INFO
             pLteSystemInfo = (PLTE_SYSTEM_INFO)pServiceStatusInfo;
-            if (pLteSystemInfo->SrvDomainValid == 0x01) {
+            if (pLteSystemInfo->SrvDomainValid == 0x01)
+            {
                 *pPSAttachedState = 0;
-                if (pLteSystemInfo->SrvDomain & 0x02) {
+                if (pLteSystemInfo->SrvDomain & 0x02)
+                {
                     *pPSAttachedState = 1;
                     is_lte = 1;
                     s_is_cdma = 0;
@@ -1390,13 +1541,16 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
                 }
             }
 #endif
-            if (pLteSystemInfo->NetworkIdValid == 0x01) {
+            if (pLteSystemInfo->NetworkIdValid == 0x01)
+            {
                 int i;
                 CHAR temp[10];
                 strncpy(temp, (CHAR *)pLteSystemInfo->MCC, 3);
                 temp[3] = '\0';
-                for (i = 0; i < 4; i++) {
-                    if ((UCHAR)temp[i] == 0xFF) {
+                for (i = 0; i < 4; i++)
+                {
+                    if ((UCHAR)temp[i] == 0xFF)
+                    {
                         temp[i] = '\0';
                     }
                 }
@@ -1404,8 +1558,10 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
 
                 strncpy(temp, (CHAR *)pLteSystemInfo->MNC, 3);
                 temp[3] = '\0';
-                for (i = 0; i < 4; i++) {
-                    if ((UCHAR)temp[i] == 0xFF) {
+                for (i = 0; i < 4; i++)
+                {
+                    if ((UCHAR)temp[i] == 0xFF)
+                    {
                         temp[i] = '\0';
                     }
                 }
@@ -1415,9 +1571,11 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
         case 0x25: // TDSCDMA
             // TDSCDMA_SYSTEM_INFO
             pTdscdmaSystemInfo = (PTDSCDMA_SYSTEM_INFO)pServiceStatusInfo;
-            if (pTdscdmaSystemInfo->SrvDomainValid == 0x01) {
+            if (pTdscdmaSystemInfo->SrvDomainValid == 0x01)
+            {
                 *pPSAttachedState = 0;
-                if (pTdscdmaSystemInfo->SrvDomain & 0x02) {
+                if (pTdscdmaSystemInfo->SrvDomain & 0x02)
+                {
                     *pPSAttachedState = 1;
                 }
             }
@@ -1429,13 +1587,16 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
                 }
             }
 #endif
-            if (pTdscdmaSystemInfo->NetworkIdValid == 0x01) {
+            if (pTdscdmaSystemInfo->NetworkIdValid == 0x01)
+            {
                 int i;
                 CHAR temp[10];
                 strncpy(temp, (CHAR *)pTdscdmaSystemInfo->MCC, 3);
                 temp[3] = '\0';
-                for (i = 0; i < 4; i++) {
-                    if ((UCHAR)temp[i] == 0xFF) {
+                for (i = 0; i < 4; i++)
+                {
+                    if ((UCHAR)temp[i] == 0xFF)
+                    {
                         temp[i] = '\0';
                     }
                 }
@@ -1443,8 +1604,10 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
 
                 strncpy(temp, (CHAR *)pTdscdmaSystemInfo->MNC, 3);
                 temp[3] = '\0';
-                for (i = 0; i < 4; i++) {
-                    if ((UCHAR)temp[i] == 0xFF) {
+                for (i = 0; i < 4; i++)
+                {
+                    if ((UCHAR)temp[i] == 0xFF)
+                    {
                         temp[i] = '\0';
                     }
                 }
@@ -1458,49 +1621,79 @@ int requestRegistrationState2(UCHAR *pPSAttachedState) {
         pServiceStatusInfo = (PSERVICE_STATUS_INFO)((PCHAR)&pServiceStatusInfo->TLVLength + le16_to_cpu(pServiceStatusInfo->TLVLength) + sizeof(USHORT));
     } /* while (remainingLen > 0) */
 
-    if (DeviceClass == DEVICE_CLASS_CDMA) {
-        if (s_hdr_personality == 2) {
+    if (DeviceClass == DEVICE_CLASS_CDMA)
+    {
+        if (s_hdr_personality == 2)
+        {
             pDataCapStr = s_hdr_personality == 2 ? "eHRPD" : "HRPD";
-        } else if (DataCapList & WWAN_DATA_CLASS_1XEVDO_REVB) {
+        }
+        else if (DataCapList & WWAN_DATA_CLASS_1XEVDO_REVB)
+        {
             pDataCapStr = wwan_data_class2str(WWAN_DATA_CLASS_1XEVDO_REVB);
-        } else if (DataCapList & WWAN_DATA_CLASS_1XEVDO_REVA) {
+        }
+        else if (DataCapList & WWAN_DATA_CLASS_1XEVDO_REVA)
+        {
             pDataCapStr = wwan_data_class2str(WWAN_DATA_CLASS_1XEVDO_REVA);
-        } else if (DataCapList & WWAN_DATA_CLASS_1XEVDO) {
+        }
+        else if (DataCapList & WWAN_DATA_CLASS_1XEVDO)
+        {
             pDataCapStr = wwan_data_class2str(WWAN_DATA_CLASS_1XEVDO);
-        } else if (DataCapList & WWAN_DATA_CLASS_1XRTT) {
+        }
+        else if (DataCapList & WWAN_DATA_CLASS_1XRTT)
+        {
             pDataCapStr = wwan_data_class2str(WWAN_DATA_CLASS_1XRTT);
-        } else if (DataCapList & WWAN_DATA_CLASS_3XRTT) {
+        }
+        else if (DataCapList & WWAN_DATA_CLASS_3XRTT)
+        {
             pDataCapStr = wwan_data_class2str(WWAN_DATA_CLASS_3XRTT);
-        } else if (DataCapList & WWAN_DATA_CLASS_UMB) {
+        }
+        else if (DataCapList & WWAN_DATA_CLASS_UMB)
+        {
             pDataCapStr = wwan_data_class2str(WWAN_DATA_CLASS_UMB);
         }
-    } else {
-        if (DataCapList & WWAN_DATA_CLASS_LTE) {
+    }
+    else
+    {
+        if (DataCapList & WWAN_DATA_CLASS_LTE)
+        {
             pDataCapStr = wwan_data_class2str(WWAN_DATA_CLASS_LTE);
-        } else if ((DataCapList & WWAN_DATA_CLASS_HSDPA) && (DataCapList & WWAN_DATA_CLASS_HSUPA)) {
+        }
+        else if ((DataCapList & WWAN_DATA_CLASS_HSDPA) && (DataCapList & WWAN_DATA_CLASS_HSUPA))
+        {
             pDataCapStr = "HSDPA_HSUPA";
-        } else if (DataCapList & WWAN_DATA_CLASS_HSDPA) {
+        }
+        else if (DataCapList & WWAN_DATA_CLASS_HSDPA)
+        {
             pDataCapStr = wwan_data_class2str(WWAN_DATA_CLASS_HSDPA);
-        } else if (DataCapList & WWAN_DATA_CLASS_HSUPA) {
+        }
+        else if (DataCapList & WWAN_DATA_CLASS_HSUPA)
+        {
             pDataCapStr = wwan_data_class2str(WWAN_DATA_CLASS_HSUPA);
-        } else if (DataCapList & WWAN_DATA_CLASS_UMTS) {
+        }
+        else if (DataCapList & WWAN_DATA_CLASS_UMTS)
+        {
             pDataCapStr = wwan_data_class2str(WWAN_DATA_CLASS_UMTS);
-        } else if (DataCapList & WWAN_DATA_CLASS_EDGE) {
+        }
+        else if (DataCapList & WWAN_DATA_CLASS_EDGE)
+        {
             pDataCapStr = wwan_data_class2str(WWAN_DATA_CLASS_EDGE);
-        } else if (DataCapList & WWAN_DATA_CLASS_GPRS) {
+        }
+        else if (DataCapList & WWAN_DATA_CLASS_GPRS)
+        {
             pDataCapStr = wwan_data_class2str(WWAN_DATA_CLASS_GPRS);
         }
     }
 
     dbg_time("%s MCC: %d, MNC: %d, PS: %s, DataCap: %s", __func__,
-        MobileCountryCode, MobileNetworkCode, (*pPSAttachedState == 1) ? "Attached" : "Detached" , pDataCapStr);
+             MobileCountryCode, MobileNetworkCode, (*pPSAttachedState == 1) ? "Attached" : "Detached", pDataCapStr);
 
     free(pResponse);
 
     return 0;
 }
 
-int requestRegistrationState(UCHAR *pPSAttachedState) {
+int requestRegistrationState(UCHAR *pPSAttachedState)
+{
     PQCQMIMSG pRequest;
     PQCQMIMSG pResponse;
     PQMUX_MSG pMUXMsg;
@@ -1512,85 +1705,126 @@ int requestRegistrationState(UCHAR *pPSAttachedState) {
     USHORT MobileNetworkCode = 0;
     const char *pDataCapStr = "UNKNOW";
 
-    if (s_9x07) {
+    if (s_9x07)
+    {
         return requestRegistrationState2(pPSAttachedState);
     }
 
     pRequest = ComposeQMUXMsg(QMUX_TYPE_NAS, QMINAS_GET_SERVING_SYSTEM_REQ, NULL, NULL);
     err = QmiThreadSendQMI(pRequest, &pResponse);
 
-    if (err < 0 || pResponse == NULL) {
+    if (err < 0 || pResponse == NULL)
+    {
         dbg_time("%s err = %d", __func__, err);
         return err;
     }
 
     pMUXMsg = &pResponse->MUXMsg;
-    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError)) {
+    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError))
+    {
         dbg_time("%s QMUXResult = 0x%x, QMUXError = 0x%x", __func__,
-            le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
+                 le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
         return le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError);
     }
 
     pCurrentPlmn = (PQMINAS_CURRENT_PLMN_MSG)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, 0x12);
-    if (pCurrentPlmn) {
+    if (pCurrentPlmn)
+    {
         MobileCountryCode = le16_to_cpu(pCurrentPlmn->MobileCountryCode);
         MobileNetworkCode = le16_to_cpu(pCurrentPlmn->MobileNetworkCode);
     }
 
     *pPSAttachedState = 0;
     pServingSystem = (PSERVING_SYSTEM)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, 0x01);
-    if (pServingSystem) {
-    //Packet-switched domain attach state of the mobile.
-    //0x00    PS_UNKNOWN ?Unknown or not applicable
-    //0x01    PS_ATTACHED ?Attached
-    //0x02    PS_DETACHED ?Detached
+    if (pServingSystem)
+    {
+        //Packet-switched domain attach state of the mobile.
+        //0x00    PS_UNKNOWN ?Unknown or not applicable
+        //0x01    PS_ATTACHED ?Attached
+        //0x02    PS_DETACHED ?Detached
         *pPSAttachedState = pServingSystem->RegistrationState;
         if (pServingSystem->RegistrationState == 0x01) //0x01 ?C REGISTERED ?C Registered with a network
-            *pPSAttachedState  = pServingSystem->PSAttachedState;
-        else {
+            *pPSAttachedState = pServingSystem->PSAttachedState;
+        else
+        {
             //MobileCountryCode = MobileNetworkCode = 0;
-            *pPSAttachedState  = 0x02;
+            *pPSAttachedState = 0x02;
         }
     }
 
     pDataCap = (PQMINAS_DATA_CAP)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, 0x11);
-    if (pDataCap && pDataCap->DataCapListLen) {
+    if (pDataCap && pDataCap->DataCapListLen)
+    {
         UCHAR *DataCap = &pDataCap->DataCap;
-        if (pDataCap->DataCapListLen == 2) {
+        if (pDataCap->DataCapListLen == 2)
+        {
             if ((DataCap[0] == 0x06) && ((DataCap[1] == 0x08) || (DataCap[1] == 0x0A)))
                 DataCap[0] = DataCap[1];
         }
-        switch (DataCap[0]) {
-             case 0x01: pDataCapStr = "GPRS"; break;
-             case 0x02: pDataCapStr = "EDGE"; break;
-             case 0x03: pDataCapStr = "HSDPA"; break;
-             case 0x04: pDataCapStr = "HSUPA"; break;
-             case 0x05: pDataCapStr = "UMTS"; break;
-             case 0x06: pDataCapStr = "1XRTT"; break;
-             case 0x07: pDataCapStr = "1XEVDO"; break;
-             case 0x08: pDataCapStr = "1XEVDO_REVA"; break;
-             case 0x09: pDataCapStr = "GPRS"; break;
-             case 0x0A: pDataCapStr = "1XEVDO_REVB"; break;
-             case 0x0B: pDataCapStr = "LTE"; break;
-             case 0x0C: pDataCapStr = "HSDPA"; break;
-             case 0x0D: pDataCapStr = "HSDPA"; break;
-             default: pDataCapStr = "UNKNOW"; break;
+        switch (DataCap[0])
+        {
+        case 0x01:
+            pDataCapStr = "GPRS";
+            break;
+        case 0x02:
+            pDataCapStr = "EDGE";
+            break;
+        case 0x03:
+            pDataCapStr = "HSDPA";
+            break;
+        case 0x04:
+            pDataCapStr = "HSUPA";
+            break;
+        case 0x05:
+            pDataCapStr = "UMTS";
+            break;
+        case 0x06:
+            pDataCapStr = "1XRTT";
+            break;
+        case 0x07:
+            pDataCapStr = "1XEVDO";
+            break;
+        case 0x08:
+            pDataCapStr = "1XEVDO_REVA";
+            break;
+        case 0x09:
+            pDataCapStr = "GPRS";
+            break;
+        case 0x0A:
+            pDataCapStr = "1XEVDO_REVB";
+            break;
+        case 0x0B:
+            pDataCapStr = "LTE";
+            break;
+        case 0x0C:
+            pDataCapStr = "HSDPA";
+            break;
+        case 0x0D:
+            pDataCapStr = "HSDPA";
+            break;
+        default:
+            pDataCapStr = "UNKNOW";
+            break;
         }
     }
 
-    if (pServingSystem && pServingSystem->RegistrationState == 0x01 && pServingSystem->InUseRadioIF && pServingSystem->RadioIF == 0x09) {
+    if (pServingSystem && pServingSystem->RegistrationState == 0x01 && pServingSystem->InUseRadioIF && pServingSystem->RadioIF == 0x09)
+    {
         pDataCapStr = "TD-SCDMA";
     }
 
     s_is_cdma = 0;
-    if (pServingSystem && pServingSystem->RegistrationState == 0x01 && pServingSystem->InUseRadioIF && (pServingSystem->RadioIF == 0x01 || pServingSystem->RadioIF == 0x02)) {
+    if (pServingSystem && pServingSystem->RegistrationState == 0x01 && pServingSystem->InUseRadioIF && (pServingSystem->RadioIF == 0x01 || pServingSystem->RadioIF == 0x02))
+    {
         USHORT cmda_mcc = 0, cdma_mnc = 0;
         s_is_cdma = 1;
-        if(!requestGetHomeNetwork(&cmda_mcc, &cdma_mnc,NULL, NULL) && cmda_mcc) {
+        if (!requestGetHomeNetwork(&cmda_mcc, &cdma_mnc, NULL, NULL) && cmda_mcc)
+        {
             quectel_convert_cdma_mcc_2_ascii_mcc(&MobileCountryCode, cmda_mcc);
             quectel_convert_cdma_mnc_2_ascii_mnc(&MobileNetworkCode, cdma_mnc);
         }
-        if (1) {
+        if (1)
+        {
             PQCQMUX_TLV pTLV = (PQCQMUX_TLV)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, 0x23);
             if (pTLV)
                 s_hdr_personality = pTLV->Value;
@@ -1602,14 +1836,15 @@ int requestRegistrationState(UCHAR *pPSAttachedState) {
     }
 
     dbg_time("%s MCC: %d, MNC: %d, PS: %s, DataCap: %s", __func__,
-        MobileCountryCode, MobileNetworkCode, (*pPSAttachedState == 1) ? "Attached" : "Detached" , pDataCapStr);
+             MobileCountryCode, MobileNetworkCode, (*pPSAttachedState == 1) ? "Attached" : "Detached", pDataCapStr);
 
     free(pResponse);
 
     return 0;
 }
 
-int requestQueryDataCall(UCHAR  *pConnectionStatus, int curIpFamily) {
+int requestQueryDataCall(UCHAR *pConnectionStatus, int curIpFamily)
+{
     PQCQMIMSG pRequest;
     PQCQMIMSG pResponse;
     PQMUX_MSG pMUXMsg;
@@ -1621,36 +1856,41 @@ int requestQueryDataCall(UCHAR  *pConnectionStatus, int curIpFamily) {
     pRequest = ComposeQMUXMsg(QMIType, QMIWDS_GET_PKT_SRVC_STATUS_REQ, NULL, NULL);
     err = QmiThreadSendQMI(pRequest, &pResponse);
 
-    if (err < 0 || pResponse == NULL) {
+    if (err < 0 || pResponse == NULL)
+    {
         dbg_time("%s err = %d", __func__, err);
         return err;
     }
 
     pMUXMsg = &pResponse->MUXMsg;
-    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError)) {
+    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError))
+    {
         dbg_time("%s QMUXResult = 0x%x, QMUXError = 0x%x", __func__,
-            le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
+                 le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
         return le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError);
     }
 
     *pConnectionStatus = QWDS_PKT_DATA_DISCONNECTED;
     pPktSrvc = (PQMIWDS_PKT_SRVC_TLV)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, 0x01);
-    if (pPktSrvc) {
+    if (pPktSrvc)
+    {
         *pConnectionStatus = pPktSrvc->ConnectionStatus;
         if ((le16_to_cpu(pPktSrvc->TLVLength) == 2) && (pPktSrvc->ReconfigReqd == 0x01))
             *pConnectionStatus = QWDS_PKT_DATA_DISCONNECTED;
     }
 
-    if (*pConnectionStatus == QWDS_PKT_DATA_DISCONNECTED) {
+    if (*pConnectionStatus == QWDS_PKT_DATA_DISCONNECTED)
+    {
         if (curIpFamily == IpFamilyV4)
             WdsConnectionIPv4Handle = 0;
         else
             WdsConnectionIPv6Handle = 0;
     }
 
-    if (oldConnectionStatus != *pConnectionStatus || debug_qmi) {
+    if (oldConnectionStatus != *pConnectionStatus || debug_qmi)
+    {
         dbg_time("%s %sConnectionStatus: %s", __func__, (curIpFamily == IpFamilyV4) ? "IPv4" : "IPv6",
-            (*pConnectionStatus == QWDS_PKT_DATA_CONNECTED) ? "CONNECTED" : "DISCONNECTED");
+                 (*pConnectionStatus == QWDS_PKT_DATA_CONNECTED) ? "CONNECTED" : "DISCONNECTED");
     }
 
     free(pResponse);
@@ -1664,7 +1904,8 @@ BOOLEAN QCMAIN_IsDualIPSupported(PMP_ADAPTER pAdapter)
 }  // QCMAIN_IsDualIPSupported
 #endif
 
-int requestSetupDataCall(PROFILE_T *profile, int curIpFamily) {
+int requestSetupDataCall(PROFILE_T *profile, int curIpFamily)
+{
     PQCQMIMSG pRequest;
     PQCQMIMSG pResponse;
     PQMUX_MSG pMUXMsg;
@@ -1678,7 +1919,8 @@ __requestSetupDataCall:
     pRequest = ComposeQMUXMsg(QMIType, QMIWDS_START_NETWORK_INTERFACE_REQ, WdsStartNwInterfaceReq, profile);
     err = QmiThreadSendQMITimeout(pRequest, &pResponse, 120 * 1000);
 
-    if (err < 0 || pResponse == NULL) {
+    if (err < 0 || pResponse == NULL)
+    {
         dbg_time("%s err = %d", __func__, err);
         return err;
     }
@@ -1687,10 +1929,10 @@ __requestSetupDataCall:
     if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError))
     {
         dbg_time("%s QMUXResult = 0x%x, QMUXError = 0x%x", __func__,
-            le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
+                 le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
 
-        if (curIpFamily == IpFamilyV4 && old_auth == profile->auth
-            && profile->user && profile->user[0] && profile->password && profile->password[0]) {
+        if (curIpFamily == IpFamilyV4 && old_auth == profile->auth && profile->user && profile->user[0] && profile->password && profile->password[0])
+        {
             profile->auth = (profile->auth == 1) ? 2 : 1;
             free(pResponse);
             goto __requestSetupDataCall;
@@ -1703,10 +1945,13 @@ __requestSetupDataCall:
         return err;
     }
 
-    if (curIpFamily == IpFamilyV4) {
+    if (curIpFamily == IpFamilyV4)
+    {
         WdsConnectionIPv4Handle = le32_to_cpu(pResponse->MUXMsg.StartNwInterfaceResp.Handle);
         dbg_time("%s WdsConnectionIPv4Handle: 0x%08x", __func__, WdsConnectionIPv4Handle);
-    } else {
+    }
+    else
+    {
         WdsConnectionIPv6Handle = le32_to_cpu(pResponse->MUXMsg.StartNwInterfaceResp.Handle);
         dbg_time("%s WdsConnectionIPv6Handle: 0x%08x", __func__, WdsConnectionIPv6Handle);
     }
@@ -1716,7 +1961,8 @@ __requestSetupDataCall:
     return 0;
 }
 
-int requestDeactivateDefaultPDP(PROFILE_T *profile, int curIpFamily) {
+int requestDeactivateDefaultPDP(PROFILE_T *profile, int curIpFamily)
+{
     PQCQMIMSG pRequest;
     PQCQMIMSG pResponse;
     PQMUX_MSG pMUXMsg;
@@ -1728,30 +1974,33 @@ int requestDeactivateDefaultPDP(PROFILE_T *profile, int curIpFamily) {
     if (curIpFamily == IpFamilyV6 && WdsConnectionIPv6Handle == 0)
         return 0;
 
-    pRequest = ComposeQMUXMsg(QMIType, QMIWDS_STOP_NETWORK_INTERFACE_REQ , WdsStopNwInterfaceReq, &curIpFamily);
+    pRequest = ComposeQMUXMsg(QMIType, QMIWDS_STOP_NETWORK_INTERFACE_REQ, WdsStopNwInterfaceReq, &curIpFamily);
     err = QmiThreadSendQMI(pRequest, &pResponse);
 
-    if (err < 0 || pResponse == NULL) {
+    if (err < 0 || pResponse == NULL)
+    {
         dbg_time("%s err = %d", __func__, err);
         return err;
     }
 
     pMUXMsg = &pResponse->MUXMsg;
-    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError)) {
+    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError))
+    {
         dbg_time("%s QMUXResult = 0x%x, QMUXError = 0x%x", __func__,
-            le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
+                 le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
         return le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError);
     }
 
     if (curIpFamily == IpFamilyV4)
         WdsConnectionIPv4Handle = 0;
     else
-         WdsConnectionIPv6Handle = 0;
+        WdsConnectionIPv6Handle = 0;
     free(pResponse);
     return 0;
 }
 
-int requestGetIPAddress(PROFILE_T *profile, int curIpFamily) {
+int requestGetIPAddress(PROFILE_T *profile, int curIpFamily)
+{
     PQCQMIMSG pRequest;
     PQCQMIMSG pResponse;
     PQMUX_MSG pMUXMsg;
@@ -1763,11 +2012,14 @@ int requestGetIPAddress(PROFILE_T *profile, int curIpFamily) {
     IPV6_T *pIpv6 = &profile->ipv6;
     UCHAR QMIType = (curIpFamily == 0x04) ? QMUX_TYPE_WDS : QMUX_TYPE_WDS_IPV6;
 
-    if (curIpFamily == IpFamilyV4) {
+    if (curIpFamily == IpFamilyV4)
+    {
         memset(pIpv4, 0x00, sizeof(IPV4_T));
         if (WdsConnectionIPv4Handle == 0)
             return 0;
-    } else if (curIpFamily == IpFamilyV6) {
+    }
+    else if (curIpFamily == IpFamilyV6)
+    {
         memset(pIpv6, 0x00, sizeof(IPV6_T));
         if (WdsConnectionIPv6Handle == 0)
             return 0;
@@ -1776,68 +2028,80 @@ int requestGetIPAddress(PROFILE_T *profile, int curIpFamily) {
     pRequest = ComposeQMUXMsg(QMIType, QMIWDS_GET_RUNTIME_SETTINGS_REQ, WdsGetRuntimeSettingReq, NULL);
     err = QmiThreadSendQMI(pRequest, &pResponse);
 
-    if (err < 0 || pResponse == NULL) {
+    if (err < 0 || pResponse == NULL)
+    {
         dbg_time("%s err = %d", __func__, err);
         return err;
     }
 
     pMUXMsg = &pResponse->MUXMsg;
-    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError)) {
+    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError))
+    {
         dbg_time("%s QMUXResult = 0x%x, QMUXError = 0x%x", __func__,
-            le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
+                 le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
         return le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError);
     }
 
     pIpv4Addr = (PQMIWDS_GET_RUNTIME_SETTINGS_TLV_IPV4_ADDR)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, QMIWDS_GET_RUNTIME_SETTINGS_TLV_TYPE_IPV4PRIMARYDNS);
-    if (pIpv4Addr) {
+    if (pIpv4Addr)
+    {
         pIpv4->DnsPrimary = pIpv4Addr->IPV4Address;
     }
 
     pIpv4Addr = (PQMIWDS_GET_RUNTIME_SETTINGS_TLV_IPV4_ADDR)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, QMIWDS_GET_RUNTIME_SETTINGS_TLV_TYPE_IPV4SECONDARYDNS);
-    if (pIpv4Addr) {
+    if (pIpv4Addr)
+    {
         pIpv4->DnsSecondary = pIpv4Addr->IPV4Address;
     }
 
     pIpv4Addr = (PQMIWDS_GET_RUNTIME_SETTINGS_TLV_IPV4_ADDR)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, QMIWDS_GET_RUNTIME_SETTINGS_TLV_TYPE_IPV4GATEWAY);
-    if (pIpv4Addr) {
+    if (pIpv4Addr)
+    {
         pIpv4->Gateway = pIpv4Addr->IPV4Address;
     }
 
     pIpv4Addr = (PQMIWDS_GET_RUNTIME_SETTINGS_TLV_IPV4_ADDR)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, QMIWDS_GET_RUNTIME_SETTINGS_TLV_TYPE_IPV4SUBNET);
-    if (pIpv4Addr) {
+    if (pIpv4Addr)
+    {
         pIpv4->SubnetMask = pIpv4Addr->IPV4Address;
     }
 
     pIpv4Addr = (PQMIWDS_GET_RUNTIME_SETTINGS_TLV_IPV4_ADDR)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, QMIWDS_GET_RUNTIME_SETTINGS_TLV_TYPE_IPV4);
-    if (pIpv4Addr) {
+    if (pIpv4Addr)
+    {
         pIpv4->Address = pIpv4Addr->IPV4Address;
     }
 
     pIpv6Addr = (PQMIWDS_GET_RUNTIME_SETTINGS_TLV_IPV6_ADDR)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, QMIWDS_GET_RUNTIME_SETTINGS_TLV_TYPE_IPV6PRIMARYDNS);
-    if (pIpv6Addr) {
+    if (pIpv6Addr)
+    {
         memcpy(pIpv6->DnsPrimary, pIpv6Addr->IPV6Address, 16);
     }
 
     pIpv6Addr = (PQMIWDS_GET_RUNTIME_SETTINGS_TLV_IPV6_ADDR)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, QMIWDS_GET_RUNTIME_SETTINGS_TLV_TYPE_IPV6SECONDARYDNS);
-    if (pIpv6Addr) {
+    if (pIpv6Addr)
+    {
         memcpy(pIpv6->DnsSecondary, pIpv6Addr->IPV6Address, 16);
     }
 
     pIpv6Addr = (PQMIWDS_GET_RUNTIME_SETTINGS_TLV_IPV6_ADDR)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, QMIWDS_GET_RUNTIME_SETTINGS_TLV_TYPE_IPV6GATEWAY);
-    if (pIpv6Addr) {
+    if (pIpv6Addr)
+    {
         memcpy(pIpv6->Gateway, pIpv6Addr->IPV6Address, 16);
         pIpv6->PrefixLengthGateway = pIpv6Addr->PrefixLength;
     }
 
     pIpv6Addr = (PQMIWDS_GET_RUNTIME_SETTINGS_TLV_IPV6_ADDR)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, QMIWDS_GET_RUNTIME_SETTINGS_TLV_TYPE_IPV6);
-    if (pIpv6Addr) {
+    if (pIpv6Addr)
+    {
         memcpy(pIpv6->Address, pIpv6Addr->IPV6Address, 16);
         pIpv6->PrefixLengthIPAddr = pIpv6Addr->PrefixLength;
     }
 
     pMtu = (PQMIWDS_GET_RUNTIME_SETTINGS_TLV_MTU)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, QMIWDS_GET_RUNTIME_SETTINGS_TLV_TYPE_MTU);
-    if (pMtu) {
-        pIpv4->Mtu =  pIpv6->Mtu =  le32_to_cpu(pMtu->Mtu);
+    if (pMtu)
+    {
+        pIpv4->Mtu = pIpv6->Mtu = le32_to_cpu(pMtu->Mtu);
     }
 
     free(pResponse);
@@ -1845,7 +2109,8 @@ int requestGetIPAddress(PROFILE_T *profile, int curIpFamily) {
 }
 
 #ifdef CONFIG_APN
-int requestSetProfile(PROFILE_T *profile) {
+int requestSetProfile(PROFILE_T *profile)
+{
     PQCQMIMSG pRequest;
     PQCQMIMSG pResponse;
     PQMUX_MSG pMUXMsg;
@@ -1858,15 +2123,17 @@ int requestSetProfile(PROFILE_T *profile) {
     pRequest = ComposeQMUXMsg(QMUX_TYPE_WDS, QMIWDS_MODIFY_PROFILE_SETTINGS_REQ, WdsModifyProfileSettingsReq, profile);
     err = QmiThreadSendQMI(pRequest, &pResponse);
 
-    if (err < 0 || pResponse == NULL) {
+    if (err < 0 || pResponse == NULL)
+    {
         dbg_time("%s err = %d", __func__, err);
         return err;
     }
 
     pMUXMsg = &pResponse->MUXMsg;
-    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError)) {
+    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError))
+    {
         dbg_time("%s QMUXResult = 0x%x, QMUXError = 0x%x", __func__,
-            le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
+                 le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
         return le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError);
     }
 
@@ -1874,7 +2141,8 @@ int requestSetProfile(PROFILE_T *profile) {
     return 0;
 }
 
-int requestGetProfile(PROFILE_T *profile) {
+int requestGetProfile(PROFILE_T *profile)
+{
     PQCQMIMSG pRequest;
     PQCQMIMSG pResponse;
     PQMUX_MSG pMUXMsg;
@@ -1894,15 +2162,17 @@ int requestGetProfile(PROFILE_T *profile) {
     pRequest = ComposeQMUXMsg(QMUX_TYPE_WDS, QMIWDS_GET_PROFILE_SETTINGS_REQ, WdsGetProfileSettingsReqSend, profile);
     err = QmiThreadSendQMI(pRequest, &pResponse);
 
-    if (err < 0 || pResponse == NULL) {
+    if (err < 0 || pResponse == NULL)
+    {
         dbg_time("%s err = %d", __func__, err);
         return err;
     }
 
     pMUXMsg = &pResponse->MUXMsg;
-    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError)) {
+    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError))
+    {
         dbg_time("%s QMUXResult = 0x%x, QMUXError = 0x%x", __func__,
-            le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
+                 le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
         return le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError);
     }
 
@@ -1911,13 +2181,14 @@ int requestGetProfile(PROFILE_T *profile) {
     pPassWd = (PQMIWDS_PASSWD)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, 0x1C);
     pAuthPref = (PQMIWDS_AUTH_PREFERENCE)GetTLV(&pResponse->MUXMsg.QMUXMsgHdr, 0x1D);
 
-    if (pApnName/* && le16_to_cpu(pApnName->TLVLength)*/)
+    if (pApnName /* && le16_to_cpu(pApnName->TLVLength)*/)
         apn = strndup((const char *)(&pApnName->ApnName), le16_to_cpu(pApnName->TLVLength));
-    if (pUserName/*  && pUserName->UserName*/)
+    if (pUserName /*  && pUserName->UserName*/)
         user = strndup((const char *)(&pUserName->UserName), le16_to_cpu(pUserName->TLVLength));
-    if (pPassWd/*  && le16_to_cpu(pPassWd->TLVLength)*/)
+    if (pPassWd /*  && le16_to_cpu(pPassWd->TLVLength)*/)
         password = strndup((const char *)(&pPassWd->Passwd), le16_to_cpu(pPassWd->TLVLength));
-    if (pAuthPref/*  && le16_to_cpu(pAuthPref->TLVLength)*/) {
+    if (pAuthPref /*  && le16_to_cpu(pAuthPref->TLVLength)*/)
+    {
         auth = pAuthPref->AuthPreference;
     }
 
@@ -1938,27 +2209,31 @@ int requestGetProfile(PROFILE_T *profile) {
 #endif
 
 #ifdef CONFIG_VERSION
-int requestBaseBandVersion(const char **pp_reversion) {
+int requestBaseBandVersion(const char **pp_reversion)
+{
     PQCQMIMSG pRequest;
     PQCQMIMSG pResponse;
     PQMUX_MSG pMUXMsg;
     PDEVICE_REV_ID revId;
     int err;
 
-    if (pp_reversion) *pp_reversion = NULL;
+    if (pp_reversion)
+        *pp_reversion = NULL;
 
     pRequest = ComposeQMUXMsg(QMUX_TYPE_DMS, QMIDMS_GET_DEVICE_REV_ID_REQ, NULL, NULL);
     err = QmiThreadSendQMI(pRequest, &pResponse);
 
-    if (err < 0 || pResponse == NULL) {
+    if (err < 0 || pResponse == NULL)
+    {
         dbg_time("%s err = %d", __func__, err);
         return err;
     }
 
     pMUXMsg = &pResponse->MUXMsg;
-    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError)) {
+    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError))
+    {
         dbg_time("%s QMUXResult = 0x%x, QMUXError = 0x%x", __func__,
-            le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
+                 le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
         return le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError);
     }
 
@@ -1968,13 +2243,15 @@ int requestBaseBandVersion(const char **pp_reversion) {
     {
         char *DeviceRevisionID = strndup((const char *)(&revId->RevisionID), le16_to_cpu(revId->TLVLength));
         dbg_time("%s %s", __func__, DeviceRevisionID);
-        if (s_9x07 == -1) { //fail to get QMUX_TYPE_WDS_ADMIN
+        if (s_9x07 == -1)
+        { //fail to get QMUX_TYPE_WDS_ADMIN
             if (strncmp(DeviceRevisionID, "EC20", strlen("EC20")))
                 s_9x07 = 1;
             else
                 s_9x07 = DeviceRevisionID[5] == 'F' || DeviceRevisionID[6] == 'F'; //EC20CF,EC20EF,EC20CEF
         }
-        if (pp_reversion) *pp_reversion = DeviceRevisionID;
+        if (pp_reversion)
+            *pp_reversion = DeviceRevisionID;
     }
 
     free(pResponse);
@@ -1983,7 +2260,8 @@ int requestBaseBandVersion(const char **pp_reversion) {
 #endif
 
 #ifdef CONFIG_RESET_RADIO
-static USHORT DmsSetOperatingModeReq(PQMUX_MSG pMUXMsg, void *arg) {
+static USHORT DmsSetOperatingModeReq(PQMUX_MSG pMUXMsg, void *arg)
+{
     pMUXMsg->SetOperatingModeReq.TLVType = 0x01;
     pMUXMsg->SetOperatingModeReq.TLVLength = cpu_to_le16(1);
     pMUXMsg->SetOperatingModeReq.OperatingMode = *((UCHAR *)arg);
@@ -1991,26 +2269,29 @@ static USHORT DmsSetOperatingModeReq(PQMUX_MSG pMUXMsg, void *arg) {
     return sizeof(QMIDMS_SET_OPERATING_MODE_REQ_MSG);
 }
 
-int requestSetOperatingMode(UCHAR OperatingMode) {
+int requestSetOperatingMode(UCHAR OperatingMode)
+{
     PQCQMIMSG pRequest;
     PQCQMIMSG pResponse;
     PQMUX_MSG pMUXMsg;
     int err;
 
     dbg_time("%s(%d)", __func__, OperatingMode);
-    
+
     pRequest = ComposeQMUXMsg(QMUX_TYPE_DMS, QMIDMS_SET_OPERATING_MODE_REQ, DmsSetOperatingModeReq, &OperatingMode);
     err = QmiThreadSendQMI(pRequest, &pResponse);
 
-    if (err < 0 || pResponse == NULL) {
+    if (err < 0 || pResponse == NULL)
+    {
         dbg_time("%s err = %d", __func__, err);
         return err;
     }
 
     pMUXMsg = &pResponse->MUXMsg;
-    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError)) {
+    if (le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult) || le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError))
+    {
         dbg_time("%s QMUXResult = 0x%x, QMUXError = 0x%x", __func__,
-            le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
+                 le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXResult), le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError));
         return le16_to_cpu(pMUXMsg->QMUXMsgHdrResp.QMUXError);
     }
 

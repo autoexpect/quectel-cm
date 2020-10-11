@@ -26,12 +26,12 @@ struct listnode
 };
 
 #define node_to_item(node, container, member) \
-    (container *) (((char*) (node)) - offsetof(container, member))
+    (container *)(((char *)(node)) - offsetof(container, member))
 
-#define list_declare(name) \
+#define list_declare(name)   \
     struct listnode name = { \
-        .next = &name, \
-        .prev = &name, \
+        .next = &name,       \
+        .prev = &name,       \
     }
 
 #define list_for_each(node, list) \
@@ -49,6 +49,6 @@ void list_remove(struct listnode *item);
 #define list_head(list) ((list)->next)
 #define list_tail(list) ((list)->prev)
 
-int epoll_register(int  epoll_fd, int  fd, unsigned int events);
-int epoll_deregister(int  epoll_fd, int  fd);
+int epoll_register(int epoll_fd, int fd, unsigned int events);
+int epoll_deregister(int epoll_fd, int fd);
 #endif

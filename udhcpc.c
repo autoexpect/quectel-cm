@@ -4,28 +4,34 @@
 #include <net/if.h>
 #include "QMIThread.h"
 
-static int ql_system(const char *shell_cmd) {
+static int ql_system(const char *shell_cmd)
+{
     int ret = 0;
     dbg_time("%s", shell_cmd);
     ret = system(shell_cmd);
-    if (ret) {
+    if (ret)
+    {
         //dbg_time("Fail to system(\"%s\") = %d, errno: %d (%s)", shell_cmd, ret, errno, strerror(errno));
     }
     return ret;
 }
 
-static void ql_set_mtu(const char *usbnet_adapter, int ifru_mtu) {
+static void ql_set_mtu(const char *usbnet_adapter, int ifru_mtu)
+{
     int inet_sock;
     struct ifreq ifr;
 
     inet_sock = socket(AF_INET, SOCK_DGRAM, 0);
 
-    if (inet_sock > 0) {
+    if (inet_sock > 0)
+    {
         strcpy(ifr.ifr_name, usbnet_adapter);
 
-        if (!ioctl(inet_sock, SIOCGIFMTU, &ifr)) {
-            if (ifr.ifr_ifru.ifru_mtu != ifru_mtu) {
-                dbg_time("change mtu %d -> %d", ifr.ifr_ifru.ifru_mtu , ifru_mtu);
+        if (!ioctl(inet_sock, SIOCGIFMTU, &ifr))
+        {
+            if (ifr.ifr_ifru.ifru_mtu != ifru_mtu)
+            {
+                dbg_time("change mtu %d -> %d", ifr.ifr_ifru.ifru_mtu, ifru_mtu);
                 ifr.ifr_ifru.ifru_mtu = ifru_mtu;
                 ioctl(inet_sock, SIOCSIFMTU, &ifr);
             }
@@ -36,7 +42,8 @@ static void ql_set_mtu(const char *usbnet_adapter, int ifru_mtu) {
 }
 
 #ifdef ANDROID
-static void android_property_set(char *ifname, char *type, uint32_t ipaddr) {
+static void android_property_set(char *ifname, char *type, uint32_t ipaddr)
+{
     char shell_cmd[128];
     unsigned char *r = (unsigned char *)&ipaddr;
 
@@ -45,8 +52,9 @@ static void android_property_set(char *ifname, char *type, uint32_t ipaddr) {
 }
 #endif
 
-static void* udhcpc_thread_function(void* arg) {
-    FILE * udhcpc_fp;
+static void *udhcpc_thread_function(void *arg)
+{
+    FILE *udhcpc_fp;
     char *udhcpc_cmd = (char *)arg;
 
     if (udhcpc_cmd == NULL)
@@ -55,10 +63,12 @@ static void* udhcpc_thread_function(void* arg) {
     dbg_time("%s", udhcpc_cmd);
     udhcpc_fp = popen(udhcpc_cmd, "r");
     free(udhcpc_cmd);
-    if (udhcpc_fp) {
+    if (udhcpc_fp)
+    {
         char buf[0xff];
 
-        while((fgets(buf, sizeof(buf), udhcpc_fp)) != NULL) {
+        while ((fgets(buf, sizeof(buf), udhcpc_fp)) != NULL)
+        {
             if ((strlen(buf) > 1) && (buf[strlen(buf) - 1] == '\n'))
                 buf[strlen(buf) - 1] = '\0';
             dbg_time("%s", buf);
@@ -76,21 +86,26 @@ static int dhclient_alive = 0;
 #endif
 static int dibbler_client_alive = 0;
 
-void udhcpc_start(PROFILE_T *profile) {
+void udhcpc_start(PROFILE_T *profile)
+{
     char *ifname = profile->usbnet_adapter;
     char shell_cmd[128];
 
-    if (profile->rawIP && profile->ipv4.Address && profile->ipv4.Mtu) {
+    if (profile->rawIP && profile->ipv4.Address && profile->ipv4.Mtu)
+    {
         ql_set_mtu(profile->usbnet_adapter, (profile->ipv4.Mtu));
     }
 
 #ifdef ANDROID
-    if(!access("/system/bin/netcfg", F_OK)) {
+    if (!access("/system/bin/netcfg", F_OK))
+    {
         snprintf(shell_cmd, sizeof(shell_cmd), "/system/bin/netcfg %s up", ifname);
         ql_system(shell_cmd);
         snprintf(shell_cmd, sizeof(shell_cmd), "/system/bin/netcfg %s dhcp", ifname);
         ql_system(shell_cmd);
-    } else {
+    }
+    else
+    {
         snprintf(shell_cmd, sizeof(shell_cmd), "/system/bin/dhcptool %s", ifname);
         ql_system(shell_cmd);
     }
@@ -103,30 +118,34 @@ void udhcpc_start(PROFILE_T *profile) {
     ql_system(shell_cmd);
 
 #if 1 //for bridge mode, only one public IP, so donot run udhcpc to obtain
-{
-    const char *BRIDGE_MODE_FILE = "/sys/module/GobiNet/parameters/bridge_mode";
-    const char *BRIDGE_IPV4_FILE = "/sys/module/GobiNet/parameters/bridge_ipv4";
+    {
+        const char *BRIDGE_MODE_FILE = "/sys/module/GobiNet/parameters/bridge_mode";
+        const char *BRIDGE_IPV4_FILE = "/sys/module/GobiNet/parameters/bridge_ipv4";
 
-    if (strncmp(qmichannel, "/dev/qcqmi", strlen("/dev/qcqmi"))) {
-        BRIDGE_MODE_FILE = "/sys/module/qmi_wwan/parameters/bridge_mode";
-        BRIDGE_IPV4_FILE = "/sys/module/qmi_wwan/parameters/bridge_ipv4";
-    }
+        if (strncmp(qmichannel, "/dev/qcqmi", strlen("/dev/qcqmi")))
+        {
+            BRIDGE_MODE_FILE = "/sys/module/qmi_wwan/parameters/bridge_mode";
+            BRIDGE_IPV4_FILE = "/sys/module/qmi_wwan/parameters/bridge_ipv4";
+        }
 
-    if (profile->ipv4.Address && !access(BRIDGE_MODE_FILE, R_OK)) {
-        int bridge_fd = open(BRIDGE_MODE_FILE, O_RDONLY);
-        char bridge_mode[2] = {0, 0};
+        if (profile->ipv4.Address && !access(BRIDGE_MODE_FILE, R_OK))
+        {
+            int bridge_fd = open(BRIDGE_MODE_FILE, O_RDONLY);
+            char bridge_mode[2] = {0, 0};
 
-        if (bridge_fd > 0) {
-            read(bridge_fd, &bridge_mode, sizeof(bridge_mode));
-            close(bridge_fd);
-            if(bridge_mode[0] != '0') {
-                snprintf(shell_cmd, sizeof(shell_cmd), "echo 0x%08x > %s", profile->ipv4.Address, BRIDGE_IPV4_FILE);
-                ql_system(shell_cmd);
-                return;
+            if (bridge_fd > 0)
+            {
+                read(bridge_fd, &bridge_mode, sizeof(bridge_mode));
+                close(bridge_fd);
+                if (bridge_mode[0] != '0')
+                {
+                    snprintf(shell_cmd, sizeof(shell_cmd), "echo 0x%08x > %s", profile->ipv4.Address, BRIDGE_IPV4_FILE);
+                    ql_system(shell_cmd);
+                    return;
+                }
             }
         }
     }
-}
 #endif
 
 //because must use udhcpc to obtain IP when working on ETH mode,
@@ -191,12 +210,14 @@ void udhcpc_start(PROFILE_T *profile) {
         pthread_attr_init(&udhcpc_thread_attr);
         pthread_attr_setdetachstate(&udhcpc_thread_attr, PTHREAD_CREATE_DETACHED);
 
-        if (profile->ipv4.Address) {
+        if (profile->ipv4.Address)
+        {
 #ifdef USE_DHCLIENT
             snprintf(udhcpc_cmd, sizeof(udhcpc_cmd), "dhclient -4 -d --no-pid %s", ifname);
             dhclient_alive++;
 #else
-            if (access("/usr/share/udhcpc/default.script", X_OK)) {
+            if (access("/usr/share/udhcpc/default.script", X_OK))
+            {
                 dbg_time("Fail to access /usr/share/udhcpc/default.script, errno: %d (%s)", errno, strerror(errno));
             }
 
@@ -208,13 +229,14 @@ void udhcpc_start(PROFILE_T *profile) {
             snprintf(udhcpc_cmd, sizeof(udhcpc_cmd), "busybox udhcpc -f -n -q -t 5 -i %s", ifname);
 #endif
 
-            pthread_create(&udhcpc_thread_id, &udhcpc_thread_attr, udhcpc_thread_function, (void*)strdup(udhcpc_cmd));
+            pthread_create(&udhcpc_thread_id, &udhcpc_thread_attr, udhcpc_thread_function, (void *)strdup(udhcpc_cmd));
             sleep(1);
         }
 
-        if (profile->ipv6.Address[0] && profile->ipv6.PrefixLengthIPAddr) {
+        if (profile->ipv6.Address[0] && profile->ipv6.PrefixLengthIPAddr)
+        {
 #ifdef USE_DHCLIENT
-            snprintf(udhcpc_cmd, sizeof(udhcpc_cmd), "dhclient -6 -d --no-pid %s",  ifname);
+            snprintf(udhcpc_cmd, sizeof(udhcpc_cmd), "dhclient -6 -d --no-pid %s", ifname);
             dhclient_alive++;
 #else
             /*
@@ -240,29 +262,35 @@ void udhcpc_start(PROFILE_T *profile) {
             dibbler_client_alive++;
 #endif
 
-            pthread_create(&udhcpc_thread_id, &udhcpc_thread_attr, udhcpc_thread_function, (void*)strdup(udhcpc_cmd));
+            pthread_create(&udhcpc_thread_id, &udhcpc_thread_attr, udhcpc_thread_function, (void *)strdup(udhcpc_cmd));
         }
     }
 }
 
-void udhcpc_stop(PROFILE_T *profile) {
+void udhcpc_stop(PROFILE_T *profile)
+{
     char *ifname = profile->usbnet_adapter;
     char shell_cmd[128];
 
 #ifdef ANDROID
-    if(!access("/system/bin/netcfg", F_OK)) {
+    if (!access("/system/bin/netcfg", F_OK))
+    {
         snprintf(shell_cmd, sizeof(shell_cmd) - 1, "/system/bin/netcfg %s down", ifname);
-    } else {
+    }
+    else
+    {
         snprintf(shell_cmd, sizeof(shell_cmd) - 1, "ifconfig %s down", ifname); //for android 6.0 and above
     }
 #else
 #ifdef USE_DHCLIENT
-    if (dhclient_alive) {
+    if (dhclient_alive)
+    {
         system("killall dhclient");
         dhclient_alive = 0;
     }
 #endif
-    if (dibbler_client_alive) {
+    if (dibbler_client_alive)
+    {
         system("killall dibbler-client");
         dibbler_client_alive = 0;
     }
