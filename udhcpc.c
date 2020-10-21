@@ -148,60 +148,6 @@ void udhcpc_start(PROFILE_T *profile)
     }
 #endif
 
-//because must use udhcpc to obtain IP when working on ETH mode,
-//so it is better also use udhcpc to obtain IP when working on IP mode.
-//use the same policy for all modules
-#if 0
-    if (profile->rawIP != 0) //mdm9x07/ec25,ec20 R2.0
-    {
-        if (profile->ipv4.Address) {
-            unsigned char *ip = (unsigned char *)&profile->ipv4.Address;
-            unsigned char *gw = (unsigned char *)&profile->ipv4.Gateway;
-            unsigned char *netmask = (unsigned char *)&profile->ipv4.SubnetMask;
-            unsigned char *dns1 = (unsigned char *)&profile->ipv4.DnsPrimary;
-            unsigned char *dns2 = (unsigned char *)&profile->ipv4.DnsSecondary;
-
-            snprintf(shell_cmd, sizeof(shell_cmd), "ifconfig %s %d.%d.%d.%d netmask %d.%d.%d.%d",ifname,
-                ip[3], ip[2], ip[1], ip[0], netmask[3], netmask[2], netmask[1], netmask[0]);
-            ql_system(shell_cmd);
-
-            //Resetting default routes
-            snprintf(shell_cmd, sizeof(shell_cmd), "route del default gw 0.0.0.0 dev %s", ifname);
-            while(!system(shell_cmd));
-
-            snprintf(shell_cmd, sizeof(shell_cmd), "route add default gw %d.%d.%d.%d dev %s metric 0", gw[3], gw[2], gw[1], gw[0], ifname);
-            ql_system(shell_cmd);
-
-            //Adding DNS
-            if (profile->ipv4.DnsSecondary == 0)
-                profile->ipv4.DnsSecondary = profile->ipv4.DnsPrimary;
-
-            if (dns1[0]) {
-                dbg_time("Adding DNS %d.%d.%d.%d %d.%d.%d.%d", dns1[3], dns1[2], dns1[1], dns1[0], dns2[3], dns2[2], dns2[1], dns2[0]);
-                snprintf(shell_cmd, sizeof(shell_cmd), "echo -n \"nameserver %d.%d.%d.%d\nnameserver %d.%d.%d.%d\n\" > /etc/resolv.conf",
-                    dns1[3], dns1[2], dns1[1], dns1[0], dns2[3], dns2[2], dns2[1], dns2[0]);
-                system(shell_cmd);
-            }
-        }
-
-        if (profile->ipv6.Address[0] && profile->ipv6.PrefixLengthIPAddr) {
-            unsigned char *ip = (unsigned char *)&profile->ipv4.Address;
-#if 1
-            snprintf(shell_cmd, sizeof(shell_cmd), "ifconfig %s inet6 add %02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x/%d",
-                ifname, ip[0], ip[1], ip[2], ip[3], ip[4], ip[5], ip[6], ip[7], ip[8], ip[9], ip[10], ip[11], ip[12], ip[13], ip[14], ip[15], profile->ipv6.PrefixLengthIPAddr);
-#else
-            snprintf(shell_cmd, sizeof(shell_cmd), "ip -6 addr add %02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x/%d dev %s",
-                ip[0], ip[1], ip[2], ip[3], ip[4], ip[5], ip[6], ip[7], ip[8], ip[9], ip[10], ip[11], ip[12], ip[13], ip[14], ip[15], profile->ipv6.PrefixLengthIPAddr, ifname);
-#endif
-            ql_system(shell_cmd);
-            snprintf(shell_cmd, sizeof(shell_cmd), "route -A inet6 add default dev %s", ifname);
-            ql_system(shell_cmd);
-        }
-
-        return;
-    }
-#endif
-
     {
         char udhcpc_cmd[128];
         pthread_attr_t udhcpc_thread_attr;
@@ -216,9 +162,9 @@ void udhcpc_start(PROFILE_T *profile)
             snprintf(udhcpc_cmd, sizeof(udhcpc_cmd), "dhclient -4 -d --no-pid %s", ifname);
             dhclient_alive++;
 #else
-            if (access("/usr/share/udhcpc/default.script", X_OK))
+            if (access("./default.script", X_OK))
             {
-                dbg_time("Fail to access /usr/share/udhcpc/default.script, errno: %d (%s)", errno, strerror(errno));
+                dbg_time("Fail to access ./default.script, errno: %d (%s)", errno, strerror(errno));
             }
 
             //-f,--foreground    Run in foreground
@@ -226,7 +172,7 @@ void udhcpc_start(PROFILE_T *profile)
             //-n,--now        Exit if lease is not obtained
             //-q,--quit        Exit after obtaining lease
             //-t,--retries N        Send up to N discover packets (default 3)
-            snprintf(udhcpc_cmd, sizeof(udhcpc_cmd), "busybox udhcpc -f -n -q -t 5 -i %s", ifname);
+            snprintf(udhcpc_cmd, sizeof(udhcpc_cmd), "busybox udhcpc -f -n -q -t 5 -i %s -s ./default.script", ifname);
 #endif
 
             pthread_create(&udhcpc_thread_id, &udhcpc_thread_attr, udhcpc_thread_function, (void *)strdup(udhcpc_cmd));
